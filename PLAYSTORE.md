@@ -3,6 +3,8 @@ Una TWA es la PWA envuelta en una app de Android. No hay que reescribir nada.
 
 Lo que ya está listo en este repo: manifest con `id`, íconos 192/512/maskable, `privacy.html`, service worker, `.well-known/assetlinks.json` (con marcadores a reemplazar).
 
+**Primero un APK de prueba (obligatorio antes de la tienda):** `bubblewrap build` también deja un `.apk`; pasalo al celular (cable o WhatsApp), instalalo y probalo con manos reales. Recién después se sube el `.aab` a Play Console.
+
 Lo que tenés que hacer vos:
 1. **Cuenta de Google Play Console** (pago único de USD 25).
 2. Con la app ya publicada en Vercel (https), instalar Bubblewrap: `npm i -g @bubblewrap/cli`, luego `bubblewrap init --manifest https://TU-DOMINIO/manifest.webmanifest` y `bubblewrap build`. Genera el `.aab` y una clave de firma (guardala y hacé copia: sin ella no podés actualizar).

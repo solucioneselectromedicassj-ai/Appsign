@@ -14,7 +14,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Ajustes ----------
-const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment' };
+const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'blue' };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
 if (!S.v) { S.cvFlip = false; S.v = 2; }
@@ -312,8 +312,23 @@ $('#cSend').onclick = async () => {
   $('#cMsg').textContent = 'Se descargó el archivo. Adjuntalo al mensaje que se abre para mandarlo al equipo.';
 };
 
+// ---------- Apariencia (tamaño de letra, fondo y color) ----------
+function applyLook() {
+  const h = document.documentElement;
+  h.style.setProperty('--fs', S.fs);
+  if (S.theme === 'auto') delete h.dataset.theme; else h.dataset.theme = S.theme;
+  if (S.accent === 'blue') delete h.dataset.accent; else h.dataset.accent = S.accent;
+  document.querySelectorAll('[data-fs]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.fs === +S.fs)));
+  document.querySelectorAll('button[data-theme]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === S.theme)));
+  document.querySelectorAll('button[data-accent]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.accent === S.accent)));
+}
+document.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => { S.fs = +b.dataset.fs; saveS(); applyLook(); });
+document.querySelectorAll('button[data-theme]').forEach(b => b.onclick = () => { S.theme = b.dataset.theme; saveS(); applyLook(); });
+document.querySelectorAll('button[data-accent]').forEach(b => b.onclick = () => { S.accent = b.dataset.accent; saveS(); applyLook(); });
+
 // ---------- Ajustes ----------
 function loadSettingsUI() {
+  applyLook();
   $('#setFacing').value = S.facing; $('#setAuto').checked = S.auto; $('#setThr').value = S.thr; $('#setLefty').checked = S.lefty; $('#setSpeak').checked = S.speak;
   updateThrLabel();
 }

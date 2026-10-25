@@ -9,11 +9,22 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
+<script>try{var _s=JSON.parse(localStorage.getItem('lsa-settings')||'{}'),_h=document.documentElement;if(_s.fs)_h.style.setProperty('--fs',_s.fs);if(_s.theme&&_s.theme!=='auto')_h.dataset.theme=_s.theme;if(_s.accent&&_s.accent!=='blue')_h.dataset.accent=_s.accent}catch(e){}</script>
 <style>
-:root{--bg:#0b1220;--bg2:#12203a;--card:#16233b;--card2:#1c2d4a;--line:#2a3d5e;--txt:#e8eef9;--mut:#9fb0cc;--acc:#7db0ff;--acc-btn:#2f6fed;--acc-ink:#ffffff;--ok:#34d399;--ok-ink:#052e1f;--warn:#fbbf24;--bad:#f87171;--shadow:0 6px 24px #0006;--r:18px}
-@media (prefers-color-scheme:light){:root{--bg:#f1f5fb;--bg2:#e3ecf9;--card:#ffffff;--card2:#eef3fb;--line:#d3deef;--txt:#0f1d36;--mut:#566a8b;--acc:#1d5fd8;--acc-btn:#1d5fd8;--acc-ink:#ffffff;--ok:#059669;--ok-ink:#ffffff;--warn:#b45309;--bad:#dc2626;--shadow:0 6px 20px #1e3a6a1f}}
+:root{--acc-d:#7db0ff;--acc-l:#1d5fd8;--btn-d:#2f6fed;--btn-l:#1d5fd8;--acc-ink:#ffffff;--r:18px}
+:root{--bg:#0b1220;--bg2:#12203a;--card:#16233b;--card2:#1c2d4a;--line:#2a3d5e;--txt:#e8eef9;--mut:#9fb0cc;--acc:var(--acc-d);--acc-btn:var(--btn-d);--ok:#34d399;--ok-ink:#052e1f;--warn:#fbbf24;--bad:#f87171;--shadow:0 6px 24px #0006}
+@media (prefers-color-scheme:light){:root:not([data-theme]){--bg:#f1f5fb;--bg2:#e3ecf9;--card:#ffffff;--card2:#eef3fb;--line:#d3deef;--txt:#0f1d36;--mut:#566a8b;--acc:var(--acc-l);--acc-btn:var(--btn-l);--ok:#059669;--ok-ink:#ffffff;--warn:#b45309;--bad:#dc2626;--shadow:0 6px 20px #1e3a6a1f}}
+:root[data-theme="light"]{--bg:#f1f5fb;--bg2:#e3ecf9;--card:#ffffff;--card2:#eef3fb;--line:#d3deef;--txt:#0f1d36;--mut:#566a8b;--acc:var(--acc-l);--acc-btn:var(--btn-l);--ok:#059669;--ok-ink:#ffffff;--warn:#b45309;--bad:#dc2626;--shadow:0 6px 20px #1e3a6a1f}
+:root[data-theme="contrast"]{--bg:#000;--bg2:#000;--card:#000;--card2:#141414;--line:#fff;--txt:#fff;--mut:#e6e6e6;--acc:#ffd60a;--acc-btn:#ffd60a;--acc-ink:#000;--ok:#4ade80;--ok-ink:#000;--warn:#ffd60a;--bad:#ff8a80;--shadow:none}
+:root[data-theme="contrast"] .card{border-width:2px}
+:root[data-accent="green"]{--acc-d:#5eead4;--acc-l:#047857;--btn-d:#0f9d77;--btn-l:#047857}
+:root[data-accent="violet"]{--acc-d:#c4b5fd;--acc-l:#6d28d9;--btn-d:#7c5cf0;--btn-l:#6d28d9}
+:root[data-accent="orange"]{--acc-d:#fdba74;--acc-l:#c2570c;--btn-d:#c2570c;--btn-l:#c2570c}
+:root[data-accent="rose"]{--acc-d:#fda4af;--acc-l:#be185d;--btn-d:#d6336c;--btn-l:#be185d}
+html{font-size:calc(16px * var(--fs,1))}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+html,body{margin:0;background:var(--bg);color:var(--txt)}
+body{font:1rem/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body{min-height:100vh;background:radial-gradient(900px 500px at 50% -120px,var(--bg2),var(--bg));padding-bottom:calc(84px + env(safe-area-inset-bottom))}
 :focus-visible{outline:3px solid var(--acc);outline-offset:2px}
 header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);z-index:5;border-bottom:1px solid var(--line)}
@@ -84,6 +95,11 @@ nav button.on svg{transform:translateY(-1px)}
 .warn{color:var(--warn)}
 details summary{cursor:pointer;color:var(--mut);min-height:36px;display:flex;align-items:center}
 a{color:var(--acc)}
+.opts{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px}
+.opts button{flex:1 1 40%;min-width:0;padding:9px 6px}
+.opts button[aria-pressed=true]{background:var(--acc-btn);color:var(--acc-ink);border-color:var(--acc-btn);font-weight:700}
+.opts button.sw{flex:none;width:46px;height:46px;min-width:46px;min-height:46px;border-radius:50%;padding:0;border:3px solid var(--line)}
+.opts button.sw[aria-pressed=true]{background-clip:padding-box;border-color:var(--txt);box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--txt)}
 .hint{margin:0 0 4px}
 .hero{display:flex;gap:14px;align-items:center}
 .hero svg{flex:none;width:44px;height:44px;color:var(--acc)}
@@ -140,12 +156,22 @@ a{color:var(--acc)}
 
   <!-- CONVERSAR -->
   <section id="tab-converse">
-    <p class="mut hint">Cada persona usa la app en su propio celular, sin conectarlos. Elegí lo que necesitás; podés usar las dos cosas a la vez.</p>
+    <p class="mut hint">Funciona con un solo celular entre los dos, o con un celular por persona (no hace falta conectarlos). Usá lo que necesites; podés tener las dos cosas encendidas a la vez.</p>
 
     <div class="card">
-      <span class="tag hear">Soy oyente</span>
-      <h3>Entender las señas de la otra persona</h3>
-      <p class="mut">Apuntá la cámara a la persona sorda. Lo que seña se escribe acá abajo.</p>
+      <span class="tag deaf">Voz a texto</span>
+      <h3>Lo que se dice, escrito</h3>
+      <p class="mut">Para que la persona sorda lea lo que dice quien habla, con letra grande y sin leer los labios. Quien oye habla cerca del celular, o la persona sorda lo apoya cerca de quien habla.</p>
+      <button id="cvMicBtn" class="pri wide"><span class="mic" id="micDot"></span>Activar micrófono</button>
+      <div id="cvMicMsg" class="mut" role="status" aria-live="polite"></div>
+      <div id="cvVoiceLog" class="big"></div>
+      <div id="cvInterim" class="big mut" style="min-height:0"></div>
+    </div>
+
+    <div class="card">
+      <span class="tag hear">Señas a texto</span>
+      <h3>Lo que seña la persona sorda, escrito</h3>
+      <p class="mut">Para que quien oye entienda las señas. Apuntá la cámara a la persona sorda.</p>
       <button id="cvCamBtn" class="pri wide">Activar cámara</button>
       <div id="cvStageSlot"></div>
       <div id="cvCamMsg" class="mut" role="status" aria-live="polite"></div>
@@ -154,17 +180,7 @@ a{color:var(--acc)}
     </div>
 
     <div class="card">
-      <span class="tag deaf">Soy una persona sorda</span>
-      <h3>Leer lo que me dicen</h3>
-      <p class="mut">Apoyá tu celular cerca de quien habla. Lo que dice se escribe acá, con letra grande, sin leer los labios.</p>
-      <button id="cvMicBtn" class="pri wide"><span class="mic" id="micDot"></span>Activar micrófono</button>
-      <div id="cvMicMsg" class="mut" role="status" aria-live="polite"></div>
-      <div id="cvVoiceLog" class="big"></div>
-      <div id="cvInterim" class="big mut" style="min-height:0"></div>
-    </div>
-
-    <div class="card">
-      <label for="cvSize">Tamaño de letra</label>
+      <label for="cvSize">Tamaño de letra de esta pantalla</label>
       <input type="range" id="cvSize" min="18" max="64" value="32" style="width:100%">
       <div class="row"><button id="cvClear" class="ghost">Borrar todo</button></div>
     </div>
@@ -207,6 +223,25 @@ a{color:var(--acc)}
       <h3>Vocabulario</h3>
       <p class="mut" id="libInfo2"></p>
       <details><summary>Ver palabras incluidas</summary><div id="vocabList" class="mut" style="margin-top:6px"></div></details>
+    </div>
+    <div class="card">
+      <h3>Apariencia</h3>
+      <label id="lblFs">Tamaño de las letras de la app</label>
+      <div class="opts" role="group" aria-labelledby="lblFs">
+        <button data-fs="1">Normal</button><button data-fs="1.2">Grande</button><button data-fs="1.4">Muy grande</button><button data-fs="1.6">Enorme</button>
+      </div>
+      <label id="lblTheme">Fondo</label>
+      <div class="opts" role="group" aria-labelledby="lblTheme">
+        <button data-theme="auto">Automático</button><button data-theme="dark">Oscuro</button><button data-theme="light">Claro</button><button data-theme="contrast">Alto contraste</button>
+      </div>
+      <label id="lblAcc">Color de la app</label>
+      <div class="opts" role="group" aria-labelledby="lblAcc">
+        <button class="sw" data-accent="blue" aria-label="Azul" style="background:#2f6fed"></button>
+        <button class="sw" data-accent="green" aria-label="Verde" style="background:#0f9d77"></button>
+        <button class="sw" data-accent="violet" aria-label="Violeta" style="background:#7c5cf0"></button>
+        <button class="sw" data-accent="orange" aria-label="Naranja" style="background:#e0701a"></button>
+        <button class="sw" data-accent="rose" aria-label="Rosa" style="background:#d6336c"></button>
+      </div>
     </div>
     <div class="card">
       <h3>Ajustes</h3>
