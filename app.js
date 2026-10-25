@@ -14,7 +14,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Ajustes ----------
-const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'blue' };
+const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'blue', help: false, cue: true };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
 if (!S.v) { S.cvFlip = false; S.v = 2; }
@@ -38,7 +38,7 @@ async function loadLibrary() {
     const d = await r.json();
     if (d.format !== 'appsign-library-v1' || !Array.isArray(d.samples)) throw new Error('formato no reconocido');
     const k = d.scale || 1000;
-    lib = d.samples.filter(validSample).map((s, i) => ({ id: i, word: normWord(s.word), feat: prepare(s.frames.map(fr => Float32Array.from(fr, v => v / k))) })).filter(s => s.word);
+    lib = d.samples.filter(validSample).map((s, i) => ({ id: i, word: normWord(s.word), feat: prepare(s.frames.map(fr => Float32Array.from(fr, v => v / k))), raw: s.frames.map(fr => fr.map(v => v / k)) })).filter(s => s.word);
     libMeta = { version: String(d.version || ''), words: new Set(lib.map(s => s.word)).size, validated: d.validated !== false };
   } catch (e) { lib = []; libMeta = { version: '', words: 0, validated: true }; console.warn('library.json:', e.message); }
   thrMemo = null;
@@ -195,23 +195,52 @@ function drawLive(raw) {
   }
 }
 
-function setStageMsg(t) { if (t !== lastMsg) { lastMsg = t; stageMsg.textContent = t; } }
+let holdUntil = 0;
+function setStageMsg(t, hold = 0) {
+  if (hold) holdUntil = Date.now() + hold; else if (Date.now() < holdUntil) return;
+  if (t !== lastMsg) { lastMsg = t; stageMsg.textContent = t; }
+}
+
+// Avisos para quien sostiene el celular: vibración y sonido suave (así no hace falta mirar la pantalla)
+let audioCtx = null;
+function cue(kind) {
+  if (!S.cue) return;
+  try { if (navigator.vibrate) navigator.vibrate(kind === 'doubt' ? [60, 90, 60] : kind === 'warn' ? [200] : [50]); } catch (e) { /* sin vibración */ }
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = kind === 'ok' ? 880 : kind === 'doubt' ? 560 : 330; g.gain.value = 0.06;
+    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.09);
+  } catch (e) { /* sin audio */ }
+}
+// Cómo le fue a esa seña: devuelve un consejo para pedirle a la persona que seña, o null si estuvo bien
+function coachFor(res) {
+  const ratio = res.frames.length ? res.frames.filter(anyPresent).length / res.frames.length : 0;
+  if (!res.ok) return 'Muy corta o muy rápida: pedile que la haga más lento';
+  if (res.dur > 4500) return 'Muy larga: pedile una sola seña y que baje las manos';
+  if (ratio < 0.6) return 'No veo bien las manos: más luz o más cerca';
+  return null;
+}
+// Compara contra el vocabulario y dice si hay duda (no alcanza el parecido, o dos palabras casi empatan)
+function judge(q16) {
+  const ranks = rank(prepare(q16), lib), thr = threshold();
+  const accepted = ranks[0].dist <= thr;
+  const margin = ranks[1] ? ranks[1].dist - ranks[0].dist : 1;
+  return { ranks, thr, accepted, doubt: !accepted || margin < 0.03 };
+}
 
 // ---------- Segmentación y consumidores ----------
 const transSeg = new Segmenter({ gapMs: 450, minFrames: 6, maxMs: 5000 });
 
+let segStart = 0;
 function handleFrame(ts, frame) {
   const has = anyPresent(frame);
-  if (tab === 'translate') {
-    const out = transSeg.push(ts, frame);
-    setStageMsg(transSeg.active ? `Capturando… ${transSeg.count} frames` : has ? 'Manos detectadas' : 'Esperando manos…');
-    if (out) onTranslateSegment(out);
-  } else if (tab === 'converse') {
-    if (!cvCam) return;
-    const out = transSeg.push(ts, frame);
-    setStageMsg(transSeg.active ? `Capturando seña… ${transSeg.count}` : has ? 'Manos detectadas' : 'Esperando señas…');
-    if (out) onConverseSegment(out);
-  }
+  if (!(tab === 'translate' || (tab === 'converse' && cvCam))) return;
+  const was = transSeg.active;
+  const out = transSeg.push(ts, frame);
+  if (!was && transSeg.active) segStart = ts;
+  setStageMsg(transSeg.active ? (ts - segStart > 3500 ? 'Bajá las manos para terminar' : 'Mirando la seña…') : has ? 'Manos detectadas' : 'Listo: pedile una seña');
+  if (out) { out.dur = ts - segStart; (tab === 'translate' ? onTranslateSegment : onConverseSegment)(out); }
 }
 
 // ---------- Traducir ----------
@@ -219,16 +248,24 @@ const transcript = [];
 let last = null;
 
 function onTranslateSegment(res) {
-  if (!res.ok) { setStageMsg('Seña demasiado corta, ignorada'); return; }
+  const tip = coachFor(res);
+  if (!res.ok) { setStageMsg(tip, 3500); cue('warn'); return; }
   const q16 = resample(res.frames);
   if (!lib.length) { last = { ranks: [], accepted: false, note: 'Todavía no hay vocabulario cargado en esta versión de la app.' }; renderLast(); return; }
-  const ranks = rank(prepare(q16), lib);
-  const thr = threshold();
-  const accepted = ranks[0].dist <= thr;
-  transcript.push({ word: accepted ? ranks[0].word : null });
-  last = { ranks, thr, accepted, idx: transcript.length - 1 };
+  const j = judge(q16);
+  transcript.push({ word: j.accepted ? j.ranks[0].word : null });
+  last = { ...j, q16, idx: transcript.length - 1 };
   renderTranscript(); renderLast();
-  if (accepted && S.speak) speak(ranks[0].word);
+  if (tip) { setStageMsg(tip, 3500); cue('warn'); }
+  else if (j.doubt) { setStageMsg('No estoy seguro/a: mirá abajo y comparalo con la persona', 3500); cue('doubt'); }
+  else { setStageMsg('✓ ' + j.ranks[0].word + ' — pedile la próxima', 2500); cue('ok'); }
+  if (j.accepted && S.speak) speak(j.ranks[0].word);
+}
+
+// Confirmar o corregir la palabra de la última seña (y, si la persona lo activó, guardar la corrección para el equipo)
+function labelLast(word) {
+  if (last && last.idx != null) { transcript[last.idx].word = word; renderTranscript(); }
+  if (last) saveCorrection(word, last.q16);
 }
 
 function renderTranscript() {
@@ -245,20 +282,92 @@ function renderLast() {
   act.innerHTML = '';
   if (last.note) { info.textContent = last.note; return; }
   const top = last.ranks[0];
-  info.innerHTML = last.accepted
-    ? `Reconocida: <b>${esc(top.word)}</b>`
-    : 'No la reconozco: puede que todavía no esté en el vocabulario.';
+  info.innerHTML = !last.doubt ? `Reconocida: <b>${esc(top.word)}</b>`
+    : last.accepted ? `Creo que es <b>${esc(top.word)}</b>, pero no estoy seguro/a.` : 'No la reconozco bien. ¿Es alguna de estas?';
   last.ranks.slice(0, 3).forEach(r => {
     const b = document.createElement('button');
     b.textContent = 'Era: ' + r.word;
-    b.onclick = () => { if (last.idx != null) { transcript[last.idx].word = r.word; renderTranscript(); } };
+    b.onclick = () => labelLast(r.word);
     act.appendChild(b);
   });
+  if (last.doubt) {
+    const c = document.createElement('button'); c.className = 'pri'; c.textContent = 'Mostrarle a la persona sorda';
+    c.onclick = () => openCompare(last.ranks.slice(0, 3), labelLast);
+    act.insertBefore(c, act.firstChild);
+  }
+  const o = document.createElement('button'); o.textContent = 'Era otra palabra…';
+  o.onclick = () => { const w = prompt('¿Qué palabra era?'); if (w && normWord(w)) labelLast(w); };
+  act.appendChild(o);
   const t = document.createElement('button');
   t.textContent = 'Es una seña nueva: enviarla al equipo';
   t.onclick = () => showTab('collab');
   act.appendChild(t);
 }
+
+// ---------- Comparar con la persona sorda: se muestra la seña del vocabulario y ella dice si es esa ----------
+const cmp = { cands: [], i: 0, pick: null, timer: 0 };
+function sampleBounds(fr) {
+  let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+  fr.forEach(f => [0, 1].forEach(sl => { if (!presentSlot(f, sl)) return; for (let p = 0; p < 21; p++) { const x = f[sl * HAND_LEN + p * 3], y = f[sl * HAND_LEN + p * 3 + 1]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } }));
+  return { x0, y0, w: Math.max(0.05, x1 - x0), h: Math.max(0.05, y1 - y0) };
+}
+function drawCmpFrame(fr, bd) {
+  const cv = $('#cmpCv'), g = cv.getContext('2d'), W = cv.width, sc = 0.82 * W / Math.max(bd.w, bd.h);
+  g.clearRect(0, 0, W, W);
+  const X = x => W / 2 + (x - bd.x0 - bd.w / 2) * sc, Y = y => W / 2 + (y - bd.y0 - bd.h / 2) * sc;
+  [0, 1].forEach(sl => {
+    if (!presentSlot(fr, sl)) return;
+    const b = sl * HAND_LEN; g.strokeStyle = g.fillStyle = COLORS[sl]; g.lineWidth = 5; g.lineCap = 'round';
+    g.beginPath(); for (const [a, c] of HAND_CONN) { g.moveTo(X(fr[b + a * 3]), Y(fr[b + a * 3 + 1])); g.lineTo(X(fr[b + c * 3]), Y(fr[b + c * 3 + 1])); } g.stroke();
+    for (let p = 0; p < 21; p++) { g.beginPath(); g.arc(X(fr[b + p * 3]), Y(fr[b + p * 3 + 1]), 5, 0, 6.3); g.fill(); }
+  });
+}
+function showCandidate() {
+  const c = cmp.cands[cmp.i], raw = lib[c.id].raw.map(f => Float32Array.from(f)), bd = sampleBounds(raw);
+  $('#cmpWord').textContent = c.word; $('#cmpNo').style.display = cmp.cands.length > 1 ? '' : 'none';
+  clearInterval(cmp.timer); let k = 0; drawCmpFrame(raw[0], bd);
+  cmp.timer = setInterval(() => { k = (k + 1) % raw.length; drawCmpFrame(raw[k], bd); }, 140);
+}
+function openCompare(ranks, pick) {
+  const seen = new Set(); cmp.cands = ranks.filter(r => !seen.has(r.word) && seen.add(r.word)); cmp.i = 0; cmp.pick = pick;
+  $('#cmp').hidden = false; showCandidate(); $('#cmpYes').focus();
+}
+function closeCompare() { clearInterval(cmp.timer); $('#cmp').hidden = true; }
+$('#cmpYes').onclick = () => { const w = cmp.cands[cmp.i].word; closeCompare(); cmp.pick(w); };
+$('#cmpNo').onclick = () => { cmp.i = (cmp.i + 1) % cmp.cands.length; showCandidate(); };
+$('#cmpOther').onclick = () => { const w = prompt('¿Qué palabra era?'); if (w && normWord(w)) { closeCompare(); cmp.pick(w); } };
+$('#cmpClose').onclick = closeCompare;
+
+// ---------- Correcciones para mandar al equipo (solo puntos de manos; nunca entran solas al vocabulario) ----------
+const CORR_KEY = 'appsign-corr';
+const corrGet = () => { try { return JSON.parse(localStorage.getItem(CORR_KEY) || '[]'); } catch (e) { return []; } };
+const corrSet = a => { try { localStorage.setItem(CORR_KEY, JSON.stringify(a)); } catch (e) { /* sin storage */ } };
+function saveCorrection(word, q16) {
+  const w = normWord(word); if (!S.help || !w || !q16) return;
+  const a = corrGet(); a.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), word: w, f: q16.map(fr => fr.map(v => Math.round(v * 1000))), t: Date.now() });
+  corrSet(a.slice(-300)); corrUI();
+}
+function corrUI() {
+  const n = corrGet().length;
+  $('#corrCount').textContent = n ? `Tenés ${n} ${n === 1 ? 'seña guardada' : 'señas guardadas'} para mandar al equipo.` : 'Todavía no hay señas guardadas.';
+  $('#corrSend').disabled = !n; $('#corrOff').style.display = S.help ? 'none' : '';
+}
+$('#corrSend').onclick = async () => {
+  const a = corrGet(); if (!a.length) return;
+  const data = { format: 'lsa-landmarks-v1', frames: T, exported: new Date().toISOString(), samples: a.map(c => ({ id: c.id, word: c.word, status: 'pending', frames: c.f.map(fr => fr.map(v => v / 1000)), created: c.t, source: 'app pública: seña corregida por el usuario', contributor: '', region: '' })) };
+  const f = new File([JSON.stringify(data)], `appsign-correcciones-${new Date().toISOString().slice(0, 10)}.json`, { type: 'application/json' });
+  const text = `Appsign: ${a.length} señas corregidas (solo puntos de las manos, sin video).`;
+  let sent = false;
+  if (navigator.canShare && navigator.canShare({ files: [f] })) {
+    try { await navigator.share({ files: [f], title: 'Appsign: correcciones', text }); sent = true; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  if (!sent) {
+    const l = document.createElement('a'); l.href = URL.createObjectURL(f); l.download = f.name; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 3000);
+    if (CONFIG.email) location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent('Appsign: correcciones')}&body=${encodeURIComponent(text + '\n\n(Adjuntá el archivo descargado)')}`;
+    else if (CONFIG.whatsapp) window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text)}`, '_blank');
+  }
+  if (confirm('¿Ya lo mandaste? Si querés, borro las señas guardadas de este celular.')) { corrSet([]); corrUI(); }
+};
 
 $('#btnClear').onclick = () => { transcript.length = 0; last = null; renderTranscript(); renderLast(); };
 $('#btnSpeak').onclick = () => speak(transcript.filter(t => t.word).map(t => t.word).join(' '));
@@ -328,7 +437,7 @@ document.querySelectorAll('button[data-accent]').forEach(b => b.onclick = () => 
 
 // ---------- Ajustes ----------
 function loadSettingsUI() {
-  applyLook();
+  applyLook(); $('#setHelp').checked = S.help; $('#setCue').checked = S.cue; corrUI();
   $('#setFacing').value = S.facing; $('#setAuto').checked = S.auto; $('#setThr').value = S.thr; $('#setLefty').checked = S.lefty; $('#setSpeak').checked = S.speak;
   updateThrLabel();
 }
@@ -336,6 +445,8 @@ function updateThrLabel() { $('#thrVal').textContent = S.auto ? 'automática' : 
 $('#setFacing').onchange = e => { S.facing = e.target.value; saveS(); if (mode === 'camera') startCamera(); else updateUI(); };
 $('#setAuto').onchange = e => { S.auto = e.target.checked; saveS(); updateThrLabel(); renderLibInfo(); };
 $('#setThr').oninput = e => { S.thr = +e.target.value; saveS(); updateThrLabel(); };
+$('#setHelp').onchange = e => { S.help = e.target.checked; saveS(); corrUI(); };
+$('#setCue').onchange = e => { S.cue = e.target.checked; saveS(); };
 $('#setLefty').onchange = e => { S.lefty = e.target.checked; saveS(); };
 $('#setSpeak').onchange = e => { S.speak = e.target.checked; saveS(); };
 
@@ -351,11 +462,17 @@ function cvRender() {
   $('#cvSignLog').innerHTML = signLines.slice(-6).map(l => `<p class="ln">${l.words.map(w => w || '¿?').map(esc).join(' ')}</p>`).join('');
   const alt = $('#cvAlt'); alt.innerHTML = '';
   if (cvLast && cvLast.ranks.length) {
+    const set = w => { cvLast.line.words[cvLast.idx] = w; saveCorrection(w, cvLast.q16); cvRender(); };
     cvLast.ranks.slice(0, 3).forEach(r => {
       const b = document.createElement('button'); b.textContent = 'Era: ' + r.word;
-      b.onclick = () => { cvLast.line.words[cvLast.idx] = r.word; cvRender(); };
+      b.onclick = () => set(r.word);
       alt.appendChild(b);
     });
+    if (cvLast.doubt) {
+      const c = document.createElement('button'); c.className = 'pri'; c.textContent = 'Mostrarle a la persona sorda';
+      c.onclick = () => openCompare(cvLast.ranks.slice(0, 3), set);
+      alt.insertBefore(c, alt.firstChild);
+    }
   }
 }
 function cvApplySettings() {
@@ -365,16 +482,20 @@ function cvApplySettings() {
 $('#cvSize').oninput = e => { S.cvSize = +e.target.value; saveS(); cvApplySettings(); };
 
 function onConverseSegment(res) {
-  if (!res.ok) return;
+  const tip = coachFor(res);
+  if (!res.ok) { setStageMsg(tip, 3500); cue('warn'); return; }
   if (!lib.length) { $('#cvCamMsg').textContent = 'Todavía no hay vocabulario cargado en esta versión de la app.'; return; }
-  const ranks = rank(prepare(resample(res.frames)), lib), thr = threshold();
-  const word = ranks[0].dist <= thr ? ranks[0].word : null;
+  const q16 = resample(res.frames), j = judge(q16);
+  const word = j.accepted ? j.ranks[0].word : null;
   const now = Date.now();
   let line = signLines[signLines.length - 1];
   if (!line || now - line.t > 4000) { line = { t: now, words: [] }; signLines.push(line); }
   line.t = now; line.words.push(word);
-  cvLast = { ranks, line, idx: line.words.length - 1 };
+  cvLast = { ranks: j.ranks, doubt: j.doubt, line, idx: line.words.length - 1, q16 };
   cvRender();
+  if (tip) { setStageMsg(tip, 3500); cue('warn'); }
+  else if (j.doubt) { setStageMsg('No estoy seguro/a: comparalo con la persona', 3500); cue('doubt'); }
+  else { setStageMsg('✓ ' + word + ' — pedile la próxima', 2500); cue('ok'); }
 }
 
 function addSpeech(text) { if (text) { voiceLines.push(text); cvRender(); } }
