@@ -1,7 +1,7 @@
 // Service worker: la app funciona sin conexión después de la primera carga.
 // Cachea el código propio y los archivos de MediaPipe (CDN + modelo) a medida que se piden.
-const CACHE = 'appsign-v6';
-const SHELL = ['./', 'index.html', 'app.js', 'core.js', 'config.js', 'library.json', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-180.png'];
+const CACHE = 'appsign-v7';
+const SHELL = ['./', 'index.html', 'app.js', 'core.js', 'config.js', 'library.json', 'manifest.webmanifest', 'icon.svg', 'privacy.html', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-180.png'];
 const EXTERNAL = ['cdn.jsdelivr.net', 'storage.googleapis.com'];
 
 self.addEventListener('install', e => {

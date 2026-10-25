@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "REEMPLAZAR.CON.TU.PACKAGE",
+    "sha256_cert_fingerprints": ["REEMPLAZAR:CON:LA:HUELLA:SHA256:DE:PLAY:CONSOLE"]
+  }
+}]

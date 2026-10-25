@@ -3,86 +3,116 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#0b1220">
+<meta name="color-scheme" content="dark light">
 <title>Appsign</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>
-:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#e2e8f0;--mut:#94a3b8;--acc:#38bdf8;--ok:#34d399;--warn:#fbbf24;--bad:#f87171}
-*{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-body{padding-bottom:76px}
-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--line)}
-header h1{font-size:1.05rem;margin:0}
-.pill{font-size:.75rem;padding:3px 9px;border-radius:99px;background:var(--card);color:var(--mut)}
+:root{--bg:#0b1220;--bg2:#12203a;--card:#16233b;--card2:#1c2d4a;--line:#2a3d5e;--txt:#e8eef9;--mut:#9fb0cc;--acc:#38bdf8;--acc-ink:#04202e;--ok:#34d399;--ok-ink:#052e1f;--warn:#fbbf24;--bad:#f87171;--shadow:0 6px 24px #0006;--r:18px}
+@media (prefers-color-scheme:light){:root{--bg:#f1f5fb;--bg2:#e3ecf9;--card:#ffffff;--card2:#eef3fb;--line:#d3deef;--txt:#0f1d36;--mut:#566a8b;--acc:#0284c7;--acc-ink:#ffffff;--ok:#059669;--ok-ink:#ffffff;--warn:#b45309;--bad:#dc2626;--shadow:0 6px 20px #1e3a6a1f}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{min-height:100vh;background:radial-gradient(900px 500px at 50% -120px,var(--bg2),var(--bg));padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);z-index:5;border-bottom:1px solid var(--line)}
+header h1{font-size:1.15rem;margin:0;display:flex;align-items:center;gap:10px;letter-spacing:.2px}
+header h1 img{border-radius:9px;display:block}
+.pill{font-size:.78rem;padding:4px 11px;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--mut);white-space:nowrap}
 .pill.ok{color:var(--ok)} .pill.err{color:var(--bad)}
-main{max-width:720px;margin:0 auto;padding:12px 14px}
-section{display:none} section.on{display:block}
-#stage{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:4/3;display:none;margin-bottom:10px}
+main{max-width:720px;margin:0 auto;padding:14px 16px}
+section{display:none} section.on{display:block;animation:in .18s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#stage{position:relative;background:#000;border-radius:var(--r);overflow:hidden;aspect-ratio:4/3;display:none;margin-bottom:12px;box-shadow:var(--shadow);border:1px solid var(--line)}
 #stage.on{display:block}
-#stage video,#stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
-#stage canvas{pointer-events:none}
-#stage.mirror video,#stage.mirror canvas{transform:scaleX(-1)}
-#stageMsg{position:absolute;left:8px;bottom:8px;right:8px;font-size:.8rem;background:#0009;padding:4px 8px;border-radius:8px;pointer-events:none}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+#stage video,#stage canvas#overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+#stage canvas#overlay{pointer-events:none}
+#stage.mirror video,#stage.mirror canvas#overlay{transform:scaleX(-1)}
+#stageMsg{position:absolute;left:10px;bottom:10px;right:10px;font-size:.82rem;color:#fff;background:#000a;padding:5px 10px;border-radius:10px;pointer-events:none;width:fit-content;max-width:calc(100% - 20px)}
+.stage-tools{position:absolute;top:10px;right:10px;display:flex;gap:8px}
+.ibtn{width:44px;height:44px;padding:0;border-radius:50%;display:grid;place-items:center;background:#000a;border:1px solid #fff3;color:#fff}
+.ibtn svg{width:22px;height:22px}
+.ibtn.rec{color:#fff}
+.ibtn.rec.on{background:var(--bad);border-color:var(--bad);animation:pulse 1.1s infinite}
+#recTime{position:absolute;top:18px;left:14px;color:#fff;font-size:.8rem;background:var(--bad);padding:2px 9px;border-radius:99px;display:none}
+#stage.recording #recTime{display:block}
+#stage.small{max-width:240px;margin-left:auto;margin-right:auto}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
 button,select,input[type=text],input[type=file]{font:inherit;color:var(--txt)}
-button{background:var(--card);border:1px solid var(--line);padding:9px 14px;border-radius:10px;cursor:pointer}
-button.pri{background:var(--acc);color:#04202e;border-color:var(--acc);font-weight:600}
-button.ok{background:var(--ok);color:#052e1f;border-color:var(--ok);font-weight:600}
+button{background:var(--card2);border:1px solid var(--line);padding:11px 16px;border-radius:14px;cursor:pointer;min-height:44px;transition:transform .08s,filter .15s}
+button:active{transform:scale(.97)}
+button:hover{filter:brightness(1.08)}
+button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:700}
+button.ok{background:var(--ok);color:var(--ok-ink);border-color:var(--ok);font-weight:700}
 button.bad{color:var(--bad)}
+button.big-btn{flex:1;min-width:160px;font-size:1.05rem;padding:14px 16px}
 button:disabled{opacity:.45;cursor:not-allowed}
-input[type=text],select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 10px;width:100%}
-label{display:block;font-size:.85rem;color:var(--mut);margin:8px 0 3px}
-label.chk{display:flex;gap:8px;align-items:flex-start;color:var(--txt);font-size:.9rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
-.card h3{margin:0 0 6px;font-size:1rem}
-.mut{color:var(--mut);font-size:.85rem}
+input[type=text],select{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px 14px;width:100%;min-height:46px}
+label{display:block;font-size:.88rem;color:var(--mut);margin:10px 0 4px}
+label.chk{display:flex;gap:10px;align-items:flex-start;color:var(--txt);font-size:.95rem;min-height:36px}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--acc);flex:none;margin-top:2px}
+input[type=range]{accent-color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:12px 0;box-shadow:var(--shadow)}
+.card h3{margin:0 0 8px;font-size:1.02rem;letter-spacing:.2px}
+.mut{color:var(--mut);font-size:.88rem}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+.chip{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:7px 12px}
+#transcript .chip{font-size:1.25rem;font-weight:600;padding:8px 14px}
 .chip.unk{color:var(--warn);border-style:dashed}
-.chip.last{border-color:var(--acc)}
-canvas.sk{width:100%;max-width:220px;aspect-ratio:1;background:#0b1220;border-radius:10px;display:block}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-table{width:100%;border-collapse:collapse;font-size:.9rem}
-td,th{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
-nav button{flex:1;border:0;border-radius:0;background:transparent;padding:12px 2px;color:var(--mut);font-size:.76rem}
-.seg{display:flex;gap:8px;align-items:flex-start}.seg img{width:120px;max-width:38%;border-radius:8px;background:#000}.seg canvas.sk{width:84px;flex:none}
-nav button.on{color:var(--acc);font-weight:600}
-nav .badge{background:var(--warn);color:#000;border-radius:99px;padding:0 6px;font-size:.7rem;margin-left:3px}
-progress{width:100%;height:8px}
+.chip.last{border-color:var(--acc);box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 30%,transparent)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav button{flex:1;border:0;border-radius:0;background:transparent;padding:8px 2px 7px;color:var(--mut);font-size:.74rem;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:60px}
+nav button svg{width:24px;height:24px}
+nav button.on{color:var(--acc);font-weight:700}
+nav button.on svg{transform:translateY(-1px)}
 .big{font-size:var(--cvsize,32px);line-height:1.25;min-height:2.5em;overflow-wrap:anywhere}
 .big .ln{margin:0 0 .35em;opacity:.6}.big .ln:last-child{opacity:1}
-#stage.small{max-width:230px;margin-left:auto;margin-right:auto}
 #cvSign.flip .big,#cvSign.flip h3,#cvSign.flip #cvAlt{transform:rotate(180deg)}
 #cvSign.flip{display:flex;flex-direction:column-reverse}
-.mic{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--mut);margin-right:6px}
+.mic{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--mut);margin-right:7px}
 .mic.on{background:var(--bad);animation:pulse 1s infinite}
-@keyframes pulse{50%{opacity:.35}}
+@keyframes pulse{50%{opacity:.55}}
 .warn{color:var(--warn)}
-details summary{cursor:pointer;color:var(--mut)}
+details summary{cursor:pointer;color:var(--mut);min-height:36px;display:flex;align-items:center}
+a{color:var(--acc)}
+.hero{display:flex;gap:14px;align-items:center}
+.hero svg{flex:none;width:44px;height:44px;color:var(--acc)}
+.camrow button{display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.camrow svg{width:20px;height:20px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <header>
-  <h1><img src="icon-192.png" alt="" width="26" height="26" style="vertical-align:-6px;border-radius:6px"> Appsign <span class="mut">· prototipo</span></h1>
-  <span id="status" class="pill">modelo sin cargar</span>
+  <h1><img src="icon-192.png" alt="" width="32" height="32"> Appsign</h1>
+  <span id="status" class="pill" role="status" aria-live="polite">modelo sin cargar</span>
 </header>
 
 <main>
   <div id="news" class="card" style="display:none;border-color:var(--ok)"></div>
-  <!-- Escenario de cámara / video, compartido por Traducir y Grabar -->
+
+  <!-- Escenario de cámara, compartido por Traducir y Conversar -->
   <div id="stage">
     <video id="video" playsinline muted></video>
     <canvas id="overlay"></canvas>
+    <span id="recTime">● REC 0:00</span>
+    <div class="stage-tools">
+      <button id="btnRec" class="ibtn rec" aria-label="Grabar video con subtítulos para compartir" title="Grabar video con subtítulos">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>
+      </button>
+      <button id="btnFlip" class="ibtn" aria-label="Cambiar de cámara" title="Cambiar de cámara">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h4l2-3h6l2 3h4v12H3z"/><path d="M9 13a3 3 0 0 1 5-2l1 1M15 14a3 3 0 0 1-5 2l-1-1"/></svg>
+      </button>
+    </div>
     <div id="stageMsg">Cámara apagada</div>
   </div>
 
   <!-- TRADUCIR -->
   <section id="tab-translate" class="on">
-    <div class="row">
-      <button id="btnCam" class="pri">Activar cámara</button>
+    <p class="mut" id="camHint" style="margin:0 0 4px">Apuntá la cámara trasera a la persona que hace las señas. Con el botón de la cámara podés pasar a la frontal para practicar vos.</p>
+    <div class="row camrow">
+      <button id="btnCam" class="pri big-btn">Activar cámara</button>
       <button id="btnSpeak">🔊 Leer en voz alta</button>
       <button id="btnClear">Borrar</button>
     </div>
@@ -101,11 +131,11 @@ details summary{cursor:pointer;color:var(--mut)}
   <!-- CONVERSAR -->
   <section id="tab-converse">
     <div class="row">
-      <button id="cvStart" class="pri">Empezar conversación</button>
-      <button id="cvStop" style="display:none">Terminar</button>
+      <button id="cvStart" class="pri big-btn">Empezar conversación</button>
+      <button id="cvStop" class="big-btn" style="display:none">Terminar</button>
       <button id="cvClear">Borrar</button>
     </div>
-    <p class="mut" id="cvMsg">Usa el micrófono (lo que dice la otra persona) y la cámara (las señas) a la vez. Apoyá el celular en la mesa.</p>
+    <p class="mut" id="cvMsg">Usa el micrófono (lo que dice la otra persona) y la cámara (las señas) a la vez. Apoyá el celular en la mesa apuntando a la persona sorda.</p>
     <div class="card" id="cvVoice">
       <h3><span class="mic" id="micDot"></span>Lo que dice la otra persona <span class="mut">· voz a texto</span></h3>
       <div id="cvVoiceLog" class="big"></div>
@@ -117,12 +147,12 @@ details summary{cursor:pointer;color:var(--mut)}
       <div id="cvAlt" class="row"></div>
     </div>
     <div class="card">
-      <label>Responder escribiendo (la app lo dice en voz alta)</label>
+      <label for="cvType">Responder escribiendo (la app lo dice en voz alta)</label>
       <input type="text" id="cvType" placeholder="Escribí acá y tocá Decir">
       <div class="row"><button id="cvSay" class="ok">🔊 Decir</button></div>
     </div>
     <div class="card">
-      <label>Tamaño de letra</label>
+      <label for="cvSize">Tamaño de letra</label>
       <input type="range" id="cvSize" min="18" max="64" value="32" style="width:100%">
       <label class="chk"><input type="checkbox" id="cvFlip"> <span>Invertir el panel de señas (para que lo lea quien está enfrente)</span></label>
     </div>
@@ -132,25 +162,29 @@ details summary{cursor:pointer;color:var(--mut)}
   <!-- COLABORAR -->
   <section id="tab-collab">
     <div class="card">
-      <h3>Colaborar con nuevas señas</h3>
+      <div class="hero">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.500-9 9-9 9z"/></svg>
+        <div><h3 style="margin:0">Colaborar con nuevas señas</h3>
+        <span class="mut">Entre todos hacemos crecer el vocabulario.</span></div>
+      </div>
       <p class="mut">¿Falta una palabra o una seña de tu región? Mandanos un video o una foto. <b>No entra sola a la app</b>: el equipo la revisa con personas de la comunidad sorda y, si es correcta, se suma en una próxima actualización del vocabulario.</p>
-      <label>¿Qué palabra o letra es?</label>
+      <label for="cWord">¿Qué palabra o letra es?</label>
       <input type="text" id="cWord" list="wordList" placeholder="ej.: hospital, B, 7, por favor" autocomplete="off">
-      <label>Región o variante (opcional)</label>
+      <label for="cRegion">Región o variante (opcional)</label>
       <input type="text" id="cRegion" placeholder="ej.: San Juan">
-      <label>Tu nombre o contacto (opcional, por si necesitamos consultarte)</label>
+      <label for="cContact">Tu nombre o contacto (opcional, por si necesitamos consultarte)</label>
       <input type="text" id="cContact" autocomplete="off">
       <div class="row">
-        <label for="cVideo" style="margin:0"><span class="chip" style="cursor:pointer">🎥 Grabar o elegir video</span></label>
+        <label for="cVideo" style="margin:0"><span class="chip" style="cursor:pointer;display:inline-block;padding:11px 14px">🎥 Grabar o elegir video</span></label>
         <input id="cVideo" type="file" accept="video/*" style="display:none">
-        <label for="cPhoto" style="margin:0"><span class="chip" style="cursor:pointer">📷 Foto</span></label>
+        <label for="cPhoto" style="margin:0"><span class="chip" style="cursor:pointer;display:inline-block;padding:11px 14px">📷 Foto</span></label>
         <input id="cPhoto" type="file" accept="image/*" style="display:none">
       </div>
       <div id="cPrev"></div>
       <p class="mut">Consejos: filmá de frente, con buena luz y fondo liso; que se vean las manos y los brazos completos. <b>Conviene que no se vea tu cara</b>. Idealmente 3 repeticiones en el mismo video, de hasta 10 segundos. Para letras y números alcanza con una foto.</p>
       <label class="chk"><input type="checkbox" id="cConsent"> <span>Acepto que el equipo de Appsign vea este archivo para validar la seña y usarla solo para armar el vocabulario del traductor. Si quiero que se borre, puedo pedirlo.</span></label>
-      <div class="row"><button id="cSend" class="ok" disabled>Enviar al equipo</button></div>
-      <div id="cMsg" class="mut"></div>
+      <div class="row"><button id="cSend" class="ok big-btn" disabled>Enviar al equipo</button></div>
+      <div id="cMsg" class="mut" role="status" aria-live="polite"></div>
       <div id="cContactInfo" class="mut"></div>
     </div>
   </section>
@@ -164,24 +198,32 @@ details summary{cursor:pointer;color:var(--mut)}
     </div>
     <div class="card">
       <h3>Ajustes</h3>
-      <label>Sensibilidad de reconocimiento: <span id="thrVal"></span></label>
+      <label for="setFacing">Cámara al activar</label>
+      <select id="setFacing">
+        <option value="environment">Trasera (apunta a la otra persona)</option>
+        <option value="user">Frontal (práctica / entrenamiento)</option>
+      </select>
+      <label for="setThr">Sensibilidad de reconocimiento: <span id="thrVal"></span></label>
       <label class="chk"><input type="checkbox" id="setAuto" checked> <span>Automática</span></label>
       <input type="range" id="setThr" min="0.02" max="1.5" step="0.01" style="width:100%">
       <label class="chk"><input type="checkbox" id="setLefty"> <span>Seño con la mano izquierda (espejar)</span></label>
       <label class="chk"><input type="checkbox" id="setSpeak"> <span>Leer en voz alta cada palabra reconocida</span></label>
     </div>
-    <p class="mut">Las señas se procesan en tu teléfono. No se guarda ni se envía video, salvo el que vos mandes desde Colaborar.</p>
+    <p class="mut">Las señas se procesan en tu teléfono. No se guarda ni se envía video, salvo el que vos mandes desde Colaborar o grabes y compartas vos. <a href="privacy.html">Política de privacidad</a></p>
   </section>
 </main>
 
 <datalist id="wordList"></datalist>
 
-
-<nav>
-  <button data-tab="translate" class="on">Traducir</button>
-  <button data-tab="converse">Conversar</button>
-  <button data-tab="collab">Colaborar</button>
-  <button data-tab="data">Ajustes</button>
+<nav aria-label="Secciones">
+  <button data-tab="translate" class="on">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Traducir</button>
+  <button data-tab="converse">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg>Conversar</button>
+  <button data-tab="collab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.500-9 9-9 9z"/></svg>Colaborar</button>
+  <button data-tab="data">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.400 15a1.700 1.700 0 0 0 .3 1.800l.1.100a2 2 0 1 1-2.800 2.800l-.1-.1a1.700 1.700 0 0 0-1.800-.3 1.700 1.700 0 0 0-1 1.500V21a2 2 0 1 1-4 0v-.1a1.700 1.700 0 0 0-1.100-1.500 1.700 1.700 0 0 0-1.800.3l-.1.100a2 2 0 1 1-2.800-2.800l.1-.1a1.700 1.700 0 0 0 .3-1.800 1.700 1.700 0 0 0-1.500-1H3a2 2 0 1 1 0-4h.1a1.700 1.700 0 0 0 1.500-1.100 1.700 1.700 0 0 0-.3-1.800l-.1-.1a2 2 0 1 1 2.800-2.800l.1.100a1.700 1.700 0 0 0 1.800.3H9a1.700 1.700 0 0 0 1-1.500V3a2 2 0 1 1 4 0v.1a1.700 1.700 0 0 0 1 1.500 1.700 1.700 0 0 0 1.800-.3l.1-.1a2 2 0 1 1 2.800 2.800l-.1.100a1.700 1.700 0 0 0-.3 1.800V9a1.700 1.700 0 0 0 1.500 1H21a2 2 0 1 1 0 4h-.1a1.700 1.700 0 0 0-1.500 1z"/></svg>Ajustes</button>
 </nav>
 
 <script type="module" src="app.js"></script>

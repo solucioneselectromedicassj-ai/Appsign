@@ -1,8 +1,8 @@
 {
   "name": "Appsign — traductor de lengua de señas",
   "short_name": "Appsign",
-  "description": "Prototipo de traductor de lengua de señas con la cámara",
-  "start_url": "./index.html",
+  "description": "Traductor de lengua de señas argentina (LSA) con la cámara del celular. Las señas se procesan en el teléfono.",
+  "start_url": "./index.html?source=pwa",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -32,5 +32,12 @@
       "sizes": "any",
       "type": "image/svg+xml"
     }
+  ],
+  "id": "/",
+  "orientation": "portrait",
+  "categories": [
+    "education",
+    "accessibility",
+    "utilities"
   ]
 }

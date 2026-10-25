@@ -5,6 +5,16 @@ Traductor de lengua de señas (LSA, Argentina) con la cámara. PWA sin build: HT
 - **Colaborar**: la persona manda un video o foto al equipo (WhatsApp/correo). **No entra sola a la app.**
 - **Vocabulario**: viene SOLO de `library.json`, que publica el equipo. Nada que haga un usuario cambia la biblioteca.
 
+## Novedades de esta versión
+- **Cámara trasera por defecto** (apunta a la persona sorda). Botón de cámara en el visor para pasar a la frontal; se recuerda la elección y solo la frontal se ve espejada.
+- **Grabar video con subtítulos** (botón rojo en el visor): graba la cámara con las palabras reconocidas (y en Conversar, también lo que dice la otra persona) y lo comparte con el menú del celular; si no se puede, lo descarga. Pide confirmar el permiso de quien aparece.
+- El motor de MediaPipe se busca primero en `mp/` y, si falta, en el CDN. Si falla, el error dice el paso (motor / wasm / modelo).
+- Diseño nuevo, con tema claro/oscuro automático. Página `privacy.html`.
+
+## Motor sin conexión (carpeta `mp/`)
+Poner en `mp/`: `vision_bundle.mjs`, la carpeta `wasm/` (de `@mediapipe/tasks-vision@0.10.14`) y `hand_landmarker.task`
+(https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task, ~8 MB).
+
 ## Configurar antes de publicar
 Editá `config.js` con el correo y/o WhatsApp del equipo (para el botón Colaborar).
 

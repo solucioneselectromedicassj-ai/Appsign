@@ -14,7 +14,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Ajustes ----------
-const defaults = { thr: 0.3, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false };
+const defaults = { thr: 0.3, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment' };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
 const saveS = () => { try { localStorage.setItem('lsa-settings', JSON.stringify(S)); } catch (e) { /* ignorar */ } };
@@ -76,19 +76,36 @@ function setStatus(t, cls = '') { const p = $('#status'); p.textContent = t; p.c
 // ---------- Modelo y cámara ----------
 let landmarker = null, mode = null, stream = null, running = false;
 
+// Primero los archivos propios (carpeta mp/, funcionan sin internet); si faltan, el CDN.
+const MP_SOURCES = [
+  { label: 'archivos propios', mod: './mp/vision_bundle.mjs', wasm: 'mp/wasm', model: 'mp/hand_landmarker.task' },
+  { label: 'CDN', mod: MP_URL, wasm: WASM_URL, model: MODEL_URL },
+];
+
 async function loadModel() {
   if (landmarker) return;
   setStatus('cargando modelo…');
-  const mp = await import(MP_URL);
-  const fs = await mp.FilesetResolver.forVisionTasks(WASM_URL);
-  const mk = delegate => mp.HandLandmarker.createFromOptions(fs, {
-    baseOptions: { modelAssetPath: MODEL_URL, delegate }, runningMode: 'VIDEO', numHands: 2,
-  });
-  try { landmarker = await mk('GPU'); } catch (e) { landmarker = await mk('CPU'); }
-  setStatus('modelo listo', 'ok');
+  const fails = [];
+  for (const src of MP_SOURCES) {
+    let step = 'motor';
+    try {
+      const mp = await import(src.mod);
+      step = 'wasm';
+      const fs = await mp.FilesetResolver.forVisionTasks(src.wasm);
+      step = 'modelo';
+      const mk = delegate => mp.HandLandmarker.createFromOptions(fs, {
+        baseOptions: { modelAssetPath: src.model, delegate }, runningMode: 'VIDEO', numHands: 2,
+      });
+      try { landmarker = await mk('GPU'); } catch (e) { landmarker = await mk('CPU'); }
+      setStatus('modelo listo', 'ok');
+      return;
+    } catch (e) { fails.push(`${src.label} (${step}): ${e.message || e.name}`); }
+  }
+  throw new Error('No se pudo cargar el reconocedor. ' + fails.join(' | '));
 }
 
 async function stopSource() {
+  if (typeof rec !== 'undefined' && rec) stopRecording();
   running = false;
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   video.pause(); video.removeAttribute('src'); video.srcObject = null; video.controls = false;
@@ -98,21 +115,34 @@ async function stopSource() {
   updateUI();
 }
 
+let mirrorView = false;
+
 async function startCamera() {
   await stopSource();
   try {
     await loadModel();
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: S.facing }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
   } catch (e) {
     setStatus('error: ' + (e.message || e.name), 'err');
     stageMsg.textContent = 'No se pudo iniciar: ' + (e.message || e.name);
     stage.classList.add('on');
     return;
   }
+  // Se espeja solo la cámara frontal (como un espejo); la trasera se ve tal cual.
+  const got = stream.getVideoTracks()[0].getSettings().facingMode;
+  mirrorView = got ? got === 'user' : S.facing === 'user';
   video.srcObject = stream; mode = 'camera';
   await video.play().catch(() => {});
   startLoop(); updateUI();
 }
+
+async function flipCamera() {
+  S.facing = S.facing === 'user' ? 'environment' : 'user'; saveS();
+  $('#setFacing').value = S.facing;
+  if (mode === 'camera') await startCamera();
+  else updateUI();
+}
+$('#btnFlip').onclick = flipCamera;
 
 function startLoop() { if (running) return; running = true; requestAnimationFrame(tick); }
 
@@ -282,10 +312,11 @@ $('#cSend').onclick = async () => {
 
 // ---------- Ajustes ----------
 function loadSettingsUI() {
-  $('#setAuto').checked = S.auto; $('#setThr').value = S.thr; $('#setLefty').checked = S.lefty; $('#setSpeak').checked = S.speak;
+  $('#setFacing').value = S.facing; $('#setAuto').checked = S.auto; $('#setThr').value = S.thr; $('#setLefty').checked = S.lefty; $('#setSpeak').checked = S.speak;
   updateThrLabel();
 }
 function updateThrLabel() { $('#thrVal').textContent = S.auto ? 'automática' : S.thr.toFixed(2); $('#setThr').disabled = S.auto; }
+$('#setFacing').onchange = e => { S.facing = e.target.value; saveS(); if (mode === 'camera') startCamera(); else updateUI(); };
 $('#setAuto').onchange = e => { S.auto = e.target.checked; saveS(); updateThrLabel(); renderLibInfo(); };
 $('#setThr').oninput = e => { S.thr = +e.target.value; saveS(); updateThrLabel(); };
 $('#setLefty').onchange = e => { S.lefty = e.target.checked; saveS(); };
@@ -373,15 +404,100 @@ $('#cvSay').onclick = () => { const v = $('#cvType').value.trim(); if (v) { spea
 $('#cvType').addEventListener('keydown', e => { if (e.key === 'Enter') $('#cvSay').click(); });
 
 
+// ---------- Grabar video con subtítulos para compartir ----------
+// Se dibuja cámara + subtítulos en un canvas y se graba ese canvas. Nada se sube: se comparte desde el celular.
+let rec = null;
+const REC_TYPES = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+
+function subtitleLines() {
+  if (tab === 'converse') {
+    const v = voiceLines[voiceLines.length - 1] || '';
+    const sl = signLines[signLines.length - 1];
+    return [sl ? sl.words.map(w => w || '¿?').join(' ') : '', v].filter(Boolean);
+  }
+  return [transcript.slice(-8).map(t => t.word || '¿?').join(' ')].filter(Boolean);
+}
+
+function wrapText(ctx, text, maxW) {
+  const out = []; let line = '';
+  for (const w of text.split(' ')) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t;
+  }
+  if (line) out.push(line);
+  return out;
+}
+
+function drawRecFrame(r) {
+  const { ctx, cv } = r, w = cv.width, h = cv.height;
+  ctx.save();
+  if (mirrorView) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(video, 0, 0, w, h);
+  ctx.restore();
+  const lines = subtitleLines();
+  if (!lines.length) return;
+  const fs = Math.round(h / 14);
+  ctx.font = `700 ${fs}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.lineJoin = 'round'; ctx.lineWidth = fs / 5; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff';
+  const rows = lines.flatMap(l => wrapText(ctx, l, w * 0.92)).slice(-3);
+  let y = h - fs * 0.5;
+  for (let i = rows.length - 1; i >= 0; i--) { ctx.strokeText(rows[i], w / 2, y); ctx.fillText(rows[i], w / 2, y); y -= fs * 1.2; }
+}
+
+function startRecording() {
+  if (!mode || !window.MediaRecorder || !video.videoWidth) { setStageMsg('Activá la cámara para grabar'); return; }
+  if (!confirm('Vas a grabar un video con subtítulos.\n\nAntes de grabar, asegurate de que la persona que aparece sabe y está de acuerdo en que la filmes y en que el video se pueda compartir.\n\n¿Empezar a grabar?')) return;
+  const type = REC_TYPES.find(t => MediaRecorder.isTypeSupported(t));
+  if (!type) { setStageMsg('Este navegador no puede grabar video'); return; }
+  const cv = document.createElement('canvas'); cv.width = video.videoWidth; cv.height = video.videoHeight;
+  const r = { cv, ctx: cv.getContext('2d'), chunks: [], t0: Date.now(), type, raf: 0, timer: 0 };
+  const loop = () => { drawRecFrame(r); r.raf = requestAnimationFrame(loop); };
+  loop();
+  r.mr = new MediaRecorder(cv.captureStream(30), { mimeType: type, videoBitsPerSecond: 2_500_000 });
+  r.mr.ondataavailable = e => { if (e.data && e.data.size) r.chunks.push(e.data); };
+  r.mr.onstop = () => { cancelAnimationFrame(r.raf); clearInterval(r.timer); finishRecording(r); };
+  r.mr.start(1000);
+  r.timer = setInterval(() => {
+    const s = Math.floor((Date.now() - r.t0) / 1000);
+    $('#recTime').textContent = `● REC ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    if (s >= 120) stopRecording(); // tope de 2 minutos
+  }, 500);
+  rec = r;
+  $('#btnRec').classList.add('on'); stage.classList.add('recording');
+}
+
+function stopRecording() {
+  if (!rec) return;
+  const r = rec; rec = null;
+  $('#btnRec').classList.remove('on'); stage.classList.remove('recording');
+  try { r.mr.stop(); } catch (e) { cancelAnimationFrame(r.raf); clearInterval(r.timer); }
+}
+
+async function finishRecording(r) {
+  if (!r.chunks.length) return;
+  const ext = r.type.includes('mp4') ? 'mp4' : 'webm';
+  const file = new File([new Blob(r.chunks, { type: r.type.split(';')[0] })], `appsign-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}.${ext}`, { type: r.type.split(';')[0] });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'Video con Appsign' }); setStageMsg('Video compartido'); return; }
+    catch (e) { if (e && e.name === 'AbortError') { setStageMsg('Envío cancelado (el video no se guardó)'); return; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  setStageMsg('Video descargado');
+}
+$('#btnRec').onclick = () => (rec ? stopRecording() : startRecording());
+
 // ---------- Navegación ----------
 function updateUI() {
   const showStage = mode && (tab === 'translate' || tab === 'converse');
   stage.classList.toggle('small', tab === 'converse');
   stage.classList.toggle('on', !!showStage);
-  stage.classList.toggle('mirror', mode === 'camera');
+  stage.classList.toggle('mirror', mode === 'camera' && mirrorView);
   $('#btnCam').textContent = mode === 'camera' ? 'Apagar cámara' : 'Activar cámara';
   $('#btnCam').className = mode === 'camera' ? '' : 'pri';
   if (!mode) stageMsg.textContent = 'Cámara apagada';
+  $('#btnFlip').title = $('#btnFlip').ariaLabel = S.facing === 'user' ? 'Cámara frontal: tocá para usar la trasera' : 'Cámara trasera: tocá para usar la frontal';
+  if (!mode && rec) stopRecording();
 }
 function showTab(name) {
   tab = name; transSeg.reset();
