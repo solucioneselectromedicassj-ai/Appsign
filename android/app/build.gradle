@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'app.appsign.traductor'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'app.appsign.traductor'
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '0.1-prueba'
+    }
+
+    // Llave SOLO de prueba (publicada a propósito en el repo). La versión de la tienda se firma con otra llave privada.
+    signingConfigs {
+        prueba {
+            storeFile file('../appsign-test.keystore')
+            storePassword 'appsigntest'
+            keyAlias 'appsigntest'
+            keyPassword 'appsigntest'
+        }
+    }
+    buildTypes {
+        debug { signingConfig signingConfigs.prueba }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

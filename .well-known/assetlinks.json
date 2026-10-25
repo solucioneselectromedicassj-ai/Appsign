@@ -1,8 +1,12 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "REEMPLAZAR.CON.TU.PACKAGE",
-    "sha256_cert_fingerprints": ["REEMPLAZAR:CON:LA:HUELLA:SHA256:DE:PLAY:CONSOLE"]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.appsign.traductor",
+      "sha256_cert_fingerprints": [
+        "7B:08:F9:CA:0D:86:5A:23:C8:96:0E:30:56:AC:EF:07:81:01:D8:A3:15:20:97:75:82:AE:11:0E:B5:75:D8:B2"
+      ]
+    }
   }
-}]
+]
