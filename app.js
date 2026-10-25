@@ -17,6 +17,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const defaults = { thr: 0.3, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment' };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
+if (!S.v) { S.cvFlip = false; S.v = 2; }
 const saveS = () => { try { localStorage.setItem('lsa-settings', JSON.stringify(S)); } catch (e) { /* ignorar */ } };
 
 // ---------- Biblioteca (solo lo que viene en library.json, publicado por el equipo) ----------
@@ -84,7 +85,7 @@ const MP_SOURCES = [
 
 async function loadModel() {
   if (landmarker) return;
-  setStatus('cargando modelo…');
+  setStatus('Cargando…');
   const fails = [];
   for (const src of MP_SOURCES) {
     let step = 'motor';
@@ -97,7 +98,7 @@ async function loadModel() {
         baseOptions: { modelAssetPath: src.model, delegate }, runningMode: 'VIDEO', numHands: 2,
       });
       try { landmarker = await mk('GPU'); } catch (e) { landmarker = await mk('CPU'); }
-      setStatus('modelo listo', 'ok');
+      setStatus('Reconocedor listo', 'ok');
       return;
     } catch (e) { fails.push(`${src.label} (${step}): ${e.message || e.name}`); }
   }
@@ -123,7 +124,7 @@ async function startCamera() {
     await loadModel();
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: S.facing }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
   } catch (e) {
-    setStatus('error: ' + (e.message || e.name), 'err');
+    setStatus('Error', 'err');
     stageMsg.textContent = 'No se pudo iniciar: ' + (e.message || e.name);
     stage.classList.add('on');
     return;
@@ -343,10 +344,10 @@ function cvRender() {
 }
 function cvApplySettings() {
   $('#tab-converse').style.setProperty('--cvsize', S.cvSize + 'px');
-  $('#cvSize').value = S.cvSize; $('#cvFlip').checked = S.cvFlip; $('#cvSign').classList.toggle('flip', S.cvFlip);
+  $('#cvSize').value = S.cvSize; $('#cvSign').classList.toggle('flip', S.cvFlip); $('#cvFlipBtn').setAttribute('aria-pressed', S.cvFlip); $('#cvFlipBtn').textContent = S.cvFlip ? 'Volver a enderezar' : 'Girar cuadro';
 }
 $('#cvSize').oninput = e => { S.cvSize = +e.target.value; saveS(); cvApplySettings(); };
-$('#cvFlip').onchange = e => { S.cvFlip = e.target.checked; saveS(); cvApplySettings(); };
+$('#cvFlipBtn').onclick = () => { S.cvFlip = !S.cvFlip; saveS(); cvApplySettings(); };
 
 function onConverseSegment(res) {
   if (!res.ok) return;
@@ -494,7 +495,7 @@ function updateUI() {
   stage.classList.toggle('on', !!showStage);
   stage.classList.toggle('mirror', mode === 'camera' && mirrorView);
   $('#btnCam').textContent = mode === 'camera' ? 'Apagar cámara' : 'Activar cámara';
-  $('#btnCam').className = mode === 'camera' ? '' : 'pri';
+  $('#btnCam').className = mode === 'camera' ? 'wide' : 'pri wide';
   if (!mode) stageMsg.textContent = 'Cámara apagada';
   $('#btnFlip').title = $('#btnFlip').ariaLabel = S.facing === 'user' ? 'Cámara frontal: tocá para usar la trasera' : 'Cámara trasera: tocá para usar la frontal';
   if (!mode && rec) stopRecording();

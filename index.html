@@ -10,8 +10,8 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>
-:root{--bg:#0b1220;--bg2:#12203a;--card:#16233b;--card2:#1c2d4a;--line:#2a3d5e;--txt:#e8eef9;--mut:#9fb0cc;--acc:#38bdf8;--acc-ink:#04202e;--ok:#34d399;--ok-ink:#052e1f;--warn:#fbbf24;--bad:#f87171;--shadow:0 6px 24px #0006;--r:18px}
-@media (prefers-color-scheme:light){:root{--bg:#f1f5fb;--bg2:#e3ecf9;--card:#ffffff;--card2:#eef3fb;--line:#d3deef;--txt:#0f1d36;--mut:#566a8b;--acc:#0284c7;--acc-ink:#ffffff;--ok:#059669;--ok-ink:#ffffff;--warn:#b45309;--bad:#dc2626;--shadow:0 6px 20px #1e3a6a1f}}
+:root{--bg:#0b1220;--bg2:#12203a;--card:#16233b;--card2:#1c2d4a;--line:#2a3d5e;--txt:#e8eef9;--mut:#9fb0cc;--acc:#7db0ff;--acc-btn:#2f6fed;--acc-ink:#ffffff;--ok:#34d399;--ok-ink:#052e1f;--warn:#fbbf24;--bad:#f87171;--shadow:0 6px 24px #0006;--r:18px}
+@media (prefers-color-scheme:light){:root{--bg:#f1f5fb;--bg2:#e3ecf9;--card:#ffffff;--card2:#eef3fb;--line:#d3deef;--txt:#0f1d36;--mut:#566a8b;--acc:#1d5fd8;--acc-btn:#1d5fd8;--acc-ink:#ffffff;--ok:#059669;--ok-ink:#ffffff;--warn:#b45309;--bad:#dc2626;--shadow:0 6px 20px #1e3a6a1f}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body{min-height:100vh;background:radial-gradient(900px 500px at 50% -120px,var(--bg2),var(--bg));padding-bottom:calc(84px + env(safe-area-inset-bottom))}
@@ -43,7 +43,17 @@ button,select,input[type=text],input[type=file]{font:inherit;color:var(--txt)}
 button{background:var(--card2);border:1px solid var(--line);padding:11px 16px;border-radius:14px;cursor:pointer;min-height:44px;transition:transform .08s,filter .15s}
 button:active{transform:scale(.97)}
 button:hover{filter:brightness(1.08)}
-button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:700}
+button.pri{background:var(--acc-btn);color:var(--acc-ink);border-color:var(--acc-btn);font-weight:700}
+button.wide{display:block;width:100%;font-size:1.1rem;padding:15px 16px;margin:10px 0}
+button.ghost{background:transparent}
+.foot{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line)}
+.foot button{flex:1;min-width:130px}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:3px 10px;border-radius:99px;margin-bottom:8px}
+.tag.deaf{background:color-mix(in srgb,var(--acc) 22%,transparent);color:var(--acc)}
+.tag.hear{background:color-mix(in srgb,var(--ok) 22%,transparent);color:var(--ok)}
+.who{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.who button{min-height:36px;padding:6px 12px;font-size:.85rem}
+#cvSign.flip .rot{transform:rotate(180deg)}
 button.ok{background:var(--ok);color:var(--ok-ink);border-color:var(--ok);font-weight:700}
 button.bad{color:var(--bad)}
 button.big-btn{flex:1;min-width:160px;font-size:1.05rem;padding:14px 16px}
@@ -66,16 +76,15 @@ nav button{flex:1;border:0;border-radius:0;background:transparent;padding:8px 2p
 nav button svg{width:24px;height:24px}
 nav button.on{color:var(--acc);font-weight:700}
 nav button.on svg{transform:translateY(-1px)}
-.big{font-size:var(--cvsize,32px);line-height:1.25;min-height:2.5em;overflow-wrap:anywhere}
+.big{font-size:var(--cvsize,32px);line-height:1.25;min-height:1.6em;overflow-wrap:anywhere}
 .big .ln{margin:0 0 .35em;opacity:.6}.big .ln:last-child{opacity:1}
-#cvSign.flip .big,#cvSign.flip h3,#cvSign.flip #cvAlt{transform:rotate(180deg)}
-#cvSign.flip{display:flex;flex-direction:column-reverse}
 .mic{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--mut);margin-right:7px}
 .mic.on{background:var(--bad);animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.55}}
 .warn{color:var(--warn)}
 details summary{cursor:pointer;color:var(--mut);min-height:36px;display:flex;align-items:center}
 a{color:var(--acc)}
+.hint{margin:0 0 4px}
 .hero{display:flex;gap:14px;align-items:center}
 .hero svg{flex:none;width:44px;height:44px;color:var(--acc)}
 .camrow button{display:inline-flex;align-items:center;gap:8px;justify-content:center}
@@ -86,7 +95,7 @@ a{color:var(--acc)}
 <body>
 <header>
   <h1><img src="icon-192.png" alt="" width="32" height="32"> Appsign</h1>
-  <span id="status" class="pill" role="status" aria-live="polite">modelo sin cargar</span>
+  <span id="status" class="pill" role="status" aria-live="polite">Listo</span>
 </header>
 
 <main>
@@ -110,15 +119,15 @@ a{color:var(--acc)}
 
   <!-- TRADUCIR -->
   <section id="tab-translate" class="on">
-    <p class="mut" id="camHint" style="margin:0 0 4px">Apuntá la cámara trasera a la persona que hace las señas. Con el botón de la cámara podés pasar a la frontal para practicar vos.</p>
-    <div class="row camrow">
-      <button id="btnCam" class="pri big-btn">Activar cámara</button>
-      <button id="btnSpeak">🔊 Leer en voz alta</button>
-      <button id="btnClear">Borrar</button>
-    </div>
+    <p class="mut hint" id="camHint">Apuntá la cámara a la persona que hace las señas. En la esquina del visor cambiás entre cámara trasera y frontal.</p>
+    <button id="btnCam" class="pri wide">Activar cámara</button>
     <div class="card">
       <h3>Texto traducido</h3>
       <div id="transcript" class="chips"><span class="mut">Poné las manos en cuadro, hacé la seña y bajalas.</span></div>
+      <div class="row foot">
+        <button id="btnSpeak" class="ghost" title="La app lee en voz alta el texto traducido">Escuchar el texto</button>
+        <button id="btnClear" class="ghost" title="Borra el texto traducido">Borrar texto</button>
+      </div>
     </div>
     <div class="card" id="lastCard" style="display:none">
       <h3>Última seña</h3>
@@ -130,31 +139,37 @@ a{color:var(--acc)}
 
   <!-- CONVERSAR -->
   <section id="tab-converse">
-    <div class="row">
-      <button id="cvStart" class="pri big-btn">Empezar conversación</button>
-      <button id="cvStop" class="big-btn" style="display:none">Terminar</button>
-      <button id="cvClear">Borrar</button>
-    </div>
-    <p class="mut" id="cvMsg">Usa el micrófono (lo que dice la otra persona) y la cámara (las señas) a la vez. Apoyá el celular en la mesa apuntando a la persona sorda.</p>
+    <p class="mut hint" id="cvMsg">Apoyá el celular en la mesa, apuntando a la persona sorda. La app escucha a quien habla y mira las señas, y escribe las dos cosas.</p>
+    <button id="cvStart" class="pri wide">Empezar conversación</button>
+    <button id="cvStop" class="wide" style="display:none">Terminar conversación</button>
+
     <div class="card" id="cvVoice">
-      <h3><span class="mic" id="micDot"></span>Lo que dice la otra persona <span class="mut">· voz a texto</span></h3>
+      <span class="tag deaf">Para la persona sorda</span>
+      <h3><span class="mic" id="micDot"></span>Lo que dice quien oye</h3>
       <div id="cvVoiceLog" class="big"></div>
       <div id="cvInterim" class="big mut" style="min-height:0"></div>
     </div>
+
     <div class="card" id="cvSign">
-      <h3>Lo que seña la persona sorda <span class="mut">· señas a texto</span></h3>
-      <div id="cvSignLog" class="big"></div>
-      <div id="cvAlt" class="row"></div>
+      <div class="who">
+        <span class="tag hear">Para quien oye</span>
+        <button id="cvFlipBtn" class="ghost" aria-pressed="false" title="Gira este cuadro para leerlo desde el otro lado de la mesa">Girar cuadro</button>
+      </div>
+      <div class="rot">
+        <h3>Lo que seña la persona sorda</h3>
+        <div id="cvSignLog" class="big"></div>
+        <div id="cvAlt" class="row"></div>
+      </div>
     </div>
+
     <div class="card">
       <label for="cvType">Responder escribiendo (la app lo dice en voz alta)</label>
       <input type="text" id="cvType" placeholder="Escribí acá y tocá Decir">
-      <div class="row"><button id="cvSay" class="ok">🔊 Decir</button></div>
+      <div class="row"><button id="cvSay" class="ok">Decir en voz alta</button><button id="cvClear" class="ghost">Borrar todo</button></div>
     </div>
     <div class="card">
       <label for="cvSize">Tamaño de letra</label>
       <input type="range" id="cvSize" min="18" max="64" value="32" style="width:100%">
-      <label class="chk"><input type="checkbox" id="cvFlip"> <span>Invertir el panel de señas (para que lo lea quien está enfrente)</span></label>
     </div>
     <p class="mut">Privacidad: el reconocimiento de voz del navegador (Chrome) envía el audio a Google para transcribirlo. Las señas se procesan en el teléfono y no se guarda ni se envía video.</p>
   </section>
