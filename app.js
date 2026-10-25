@@ -1,4 +1,4 @@
-import { T, FRAME_LEN, HAND_LEN, Segmenter, resample, prepare, rank, mirrorFrame, anyPresent, presentSlot, normWord, autoThreshold } from './core.js';
+import { T, FRAME_LEN, HAND_LEN, Segmenter, resample, prepare, rank, mirrorFrame, anyPresent, presentSlot, normWord, autoThreshold, suggestPhrase } from './core.js';
 import { CONFIG } from './config.js';
 
 // ---------- Configuración ----------
@@ -21,7 +21,7 @@ if (!S.v) { S.cvFlip = false; S.v = 2; }
 const saveS = () => { try { localStorage.setItem('lsa-settings', JSON.stringify(S)); } catch (e) { /* ignorar */ } };
 
 // ---------- Biblioteca (solo lo que viene en library.json, publicado por el equipo) ----------
-let lib = [], libMeta = { version: '', words: 0, validated: true };
+let lib = [], libMeta = { version: '', words: 0, validated: true }, phrases = [];
 const libOf = () => lib;
 let thrMemo = null;
 function threshold() {
@@ -40,7 +40,8 @@ async function loadLibrary() {
     const k = d.scale || 1000;
     lib = d.samples.filter(validSample).map((s, i) => ({ id: i, word: normWord(s.word), feat: prepare(s.frames.map(fr => Float32Array.from(fr, v => v / k))), raw: s.frames.map(fr => fr.map(v => v / k)) })).filter(s => s.word);
     libMeta = { version: String(d.version || ''), words: new Set(lib.map(s => s.word)).size, validated: d.validated !== false };
-  } catch (e) { lib = []; libMeta = { version: '', words: 0, validated: true }; console.warn('library.json:', e.message); }
+    phrases = (Array.isArray(d.phrases) ? d.phrases : []).map(p => ({ signs: (p.signs || []).map(normWord).filter(Boolean), text: String(p.text || '').trim() })).filter(p => p.signs.length >= 2 && p.text);
+  } catch (e) { lib = []; phrases = []; libMeta = { version: '', words: 0, validated: true }; console.warn('library.json:', e.message); }
   thrMemo = null;
   announceUpdate();
   renderLibInfo();
@@ -253,7 +254,7 @@ function onTranslateSegment(res) {
   const q16 = resample(res.frames);
   if (!lib.length) { last = { ranks: [], accepted: false, note: 'Todavía no hay vocabulario cargado en esta versión de la app.' }; renderLast(); return; }
   const j = judge(q16);
-  transcript.push({ word: j.accepted ? j.ranks[0].word : null });
+  transcript.push({ word: j.accepted ? j.ranks[0].word : null, cands: j.ranks.slice(0, 3).map(r => r.word) });
   last = { ...j, q16, idx: transcript.length - 1 };
   renderTranscript(); renderLast();
   if (tip) { setStageMsg(tip, 3500); cue('warn'); }
@@ -264,14 +265,29 @@ function onTranslateSegment(res) {
 
 // Confirmar o corregir la palabra de la última seña (y, si la persona lo activó, guardar la corrección para el equipo)
 function labelLast(word) {
-  if (last && last.idx != null) { transcript[last.idx].word = word; renderTranscript(); }
+  if (last && last.idx != null) { transcript[last.idx].word = word; transcript[last.idx].cands = [word]; renderTranscript(); }
   if (last) saveCorrection(word, last.q16);
 }
 
 function renderTranscript() {
   const el = $('#transcript');
+  renderPhrase();
   if (!transcript.length) { el.innerHTML = '<span class="mut">Poné las manos en cuadro, hacé la seña y bajalas.</span>'; return; }
-  el.innerHTML = transcript.map((t, i) => `<span class="chip ${t.word ? '' : 'unk'} ${i === transcript.length - 1 ? 'last' : ''}">${t.word ? esc(t.word) : '¿?'}</span>`).join('');
+  el.innerHTML = transcript.map((t, i) => `<span class="chip ${t.phrase ? 'phrase' : t.word ? '' : 'unk'} ${i === transcript.length - 1 ? 'last' : ''}">${t.phrase ? esc(t.phrase) : t.word ? esc(t.word) : '¿?'}</span>`).join('');
+}
+
+// Prototipo de frases: si las últimas señas encajan con una frase de la lista del equipo, se propone completarla
+let phraseSug = null;
+function renderPhrase() {
+  const box = $('#phraseBox');
+  phraseSug = phrases.length ? suggestPhrase(transcript, phrases) : null; // las entradas que ya son frase no tienen candidatas: no se vuelven a proponer
+  if (!phraseSug) { box.style.display = 'none'; return; }
+  const ph = phraseSug.phrase, full = phraseSug.kind === 'full';
+  box.style.display = '';
+  box.innerHTML = full
+    ? `<div><b>¿Querés decir:</b> «${esc(ph.text)}»?</div><div class="mut">Las señas leídas se parecen a esta frase, aunque alguna no esté segura. Confirmalo con la persona.</div><div class="row"><button class="pri" id="phUse">Usar la frase</button></div>`
+    : `<div><b>Parece el comienzo de:</b> «${esc(ph.text)}»</div><div class="mut">Faltan: ${esc(ph.signs.slice(phraseSug.matched).join(' · '))}</div>`;
+  const u = $('#phUse'); if (u) u.onclick = () => { transcript.splice(-phraseSug.n, phraseSug.n, { phrase: ph.text, word: null }); if (S.speak) speak(ph.text); renderTranscript(); };
 }
 
 function renderLast() {
@@ -370,7 +386,7 @@ $('#corrSend').onclick = async () => {
 };
 
 $('#btnClear').onclick = () => { transcript.length = 0; last = null; renderTranscript(); renderLast(); };
-$('#btnSpeak').onclick = () => speak(transcript.filter(t => t.word).map(t => t.word).join(' '));
+$('#btnSpeak').onclick = () => speak(transcript.map(t => t.phrase || t.word).filter(Boolean).join(' '));
 function speak(text) {
   if (!text || !('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(text); u.lang = 'es-AR';
@@ -557,7 +573,7 @@ function subtitleLines() {
     const sl = signLines[signLines.length - 1];
     return [sl ? sl.words.map(w => w || '¿?').join(' ') : '', v].filter(Boolean);
   }
-  return [transcript.slice(-8).map(t => t.word || '¿?').join(' ')].filter(Boolean);
+  return [transcript.slice(-8).map(t => t.phrase || t.word || '¿?').join(' ')].filter(Boolean);
 }
 
 function wrapText(ctx, text, maxW) {
@@ -658,5 +674,5 @@ $('#btnCam').onclick = () => (mode === 'camera' ? stopSource() : startCamera());
   loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); renderTranscript(); updateUI();
   await loadLibrary();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-  window.__lsa = { get lib() { return lib; }, get meta() { return libMeta; }, S, rank, prepare, resample };
+  window.__lsa = { get lib() { return lib; }, get phrases() { return phrases; }, transcript, renderTranscript, get meta() { return libMeta; }, S, rank, prepare, resample };
 })();

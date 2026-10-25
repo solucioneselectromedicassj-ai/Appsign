@@ -80,6 +80,8 @@ input[type=range]{accent-color:var(--acc)}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chip{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:7px 12px}
 #transcript .chip{font-size:1.25rem;font-weight:600;padding:8px 14px}
+.chip.phrase{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--bg));font-weight:700}
+.phrase{margin-top:12px;padding:12px;border:1px dashed var(--ok);border-radius:14px}
 .chip.unk{color:var(--warn);border-style:dashed}
 .chip.last{border-color:var(--acc);box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 30%,transparent)}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
@@ -145,6 +147,7 @@ a{color:var(--acc)}
     <div class="card">
       <h3>Texto traducido</h3>
       <div id="transcript" class="chips"><span class="mut">Poné las manos en cuadro, hacé la seña y bajalas.</span></div>
+      <div id="phraseBox" class="phrase" style="display:none" aria-live="polite"></div>
       <div class="row foot">
         <button id="btnSpeak" class="ghost" title="La app lee en voz alta el texto traducido">Escuchar el texto</button>
         <button id="btnClear" class="ghost" title="Borra el texto traducido">Borrar texto</button>

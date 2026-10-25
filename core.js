@@ -171,3 +171,31 @@ export function autoThreshold(lib, fallback = 0.6) {
   const p90 = ds[Math.floor(0.9 * (ds.length - 1))];
   return Math.max(0.03, p90 * 1.6);
 }
+
+// Frases: ¿las últimas señas leídas encajan con el comienzo, el final y buena parte del medio de una frase conocida?
+// entries: [{word, cands:[palabras candidatas]}] ; phrases: [{signs:[...], text}]
+// Devuelve {phrase, kind:'full'|'prefix', n, matched} o null. No inventa nada: solo propone frases de la lista del equipo.
+export function suggestPhrase(entries, phrases) {
+  const has = (e, w) => !!e && (e.cands || (e.word ? [e.word] : [])).includes(w);
+  let best = null;
+  for (const ph of phrases || []) {
+    const n = ph.signs.length; if (n < 2) continue;
+    if (entries.length >= n) {
+      const win = entries.slice(-n); let m = 0;
+      win.forEach((e, i) => { if (has(e, ph.signs[i])) m++; });
+      if (has(win[0], ph.signs[0]) && has(win[n - 1], ph.signs[n - 1]) && m / n >= 0.6) {
+        const score = m / n + n * 0.01;
+        if (!best || score > best.score) best = { phrase: ph, kind: 'full', n, matched: m, score };
+      }
+    }
+    for (let k = Math.min(n - 1, entries.length); k >= 2; k--) {
+      const win = entries.slice(-k);
+      if (win.every((e, i) => has(e, ph.signs[i]))) {
+        const score = (k / n) * 0.9;
+        if (!best || score > best.score) best = { phrase: ph, kind: 'prefix', n, matched: k, score };
+        break;
+      }
+    }
+  }
+  return best;
+}
