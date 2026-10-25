@@ -21,7 +21,7 @@ if (!S.v) { S.cvFlip = false; S.v = 2; }
 const saveS = () => { try { localStorage.setItem('lsa-settings', JSON.stringify(S)); } catch (e) { /* ignorar */ } };
 
 // ---------- Biblioteca (solo lo que viene en library.json, publicado por el equipo) ----------
-let lib = [], libMeta = { version: '', words: 0 };
+let lib = [], libMeta = { version: '', words: 0, validated: true };
 const libOf = () => lib;
 let thrMemo = null;
 function threshold() {
@@ -39,8 +39,8 @@ async function loadLibrary() {
     if (d.format !== 'appsign-library-v1' || !Array.isArray(d.samples)) throw new Error('formato no reconocido');
     const k = d.scale || 1000;
     lib = d.samples.filter(validSample).map((s, i) => ({ id: i, word: normWord(s.word), feat: prepare(s.frames.map(fr => Float32Array.from(fr, v => v / k))) })).filter(s => s.word);
-    libMeta = { version: String(d.version || ''), words: new Set(lib.map(s => s.word)).size };
-  } catch (e) { lib = []; libMeta = { version: '', words: 0 }; console.warn('library.json:', e.message); }
+    libMeta = { version: String(d.version || ''), words: new Set(lib.map(s => s.word)).size, validated: d.validated !== false };
+  } catch (e) { lib = []; libMeta = { version: '', words: 0, validated: true }; console.warn('library.json:', e.message); }
   thrMemo = null;
   announceUpdate();
   renderLibInfo();
@@ -61,6 +61,7 @@ function announceUpdate() {
   } else box.style.display = 'none';
 }
 function renderLibInfo() {
+  $('#testBanner').style.display = lib.length && !libMeta.validated ? '' : 'none';
   const t = lib.length ? `Vocabulario v${libMeta.version}: ${libMeta.words} palabras (${lib.length} muestras) · umbral ${threshold().toFixed(3)}${S.auto ? ' (auto)' : ''}` : 'Todavía no hay vocabulario cargado en esta versión.';
   $('#libInfo').textContent = t; $('#libInfo2').textContent = t;
   const words = [...new Set(lib.map(s => s.word))].sort((a, b) => a.localeCompare(b, 'es'));
