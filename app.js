@@ -14,7 +14,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Ajustes ----------
-const defaults = { thr: 0.3, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment' };
+const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment' };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
 if (!S.v) { S.cvFlip = false; S.v = 2; }
@@ -62,7 +62,7 @@ function announceUpdate() {
 }
 function renderLibInfo() {
   $('#testBanner').style.display = lib.length && !libMeta.validated ? '' : 'none';
-  const t = lib.length ? `Vocabulario v${libMeta.version}: ${libMeta.words} palabras (${lib.length} muestras) · umbral ${threshold().toFixed(3)}${S.auto ? ' (auto)' : ''}` : 'Todavía no hay vocabulario cargado en esta versión.';
+  const t = lib.length ? `Vocabulario ${/^\d/.test(libMeta.version) ? 'v' : ''}${libMeta.version}: ${libMeta.words} palabras (${lib.length} muestras) · umbral ${threshold().toFixed(3)}${S.auto ? ' (auto)' : ''}` : 'Todavía no hay vocabulario cargado en esta versión.';
   $('#libInfo').textContent = t; $('#libInfo2').textContent = t;
   const words = [...new Set(lib.map(s => s.word))].sort((a, b) => a.localeCompare(b, 'es'));
   $('#vocabList').textContent = words.join(' · ') || '—';
