@@ -646,6 +646,31 @@ async function finishRecording(r) {
 }
 $('#btnRec').onclick = () => (rec ? stopRecording() : startRecording());
 
+// ---------- Instalar y compartir ----------
+let installEvt = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || /[?&]source=(apk|pwa)/.test(location.search);
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function installUI() {
+  const b = $('#btnInstall'), m = $('#installMsg');
+  if (standalone()) { b.style.display = 'none'; m.textContent = 'Ya estás usando la app instalada.'; return; }
+  b.style.display = '';
+  m.textContent = isIOS ? 'En iPhone: abrí este link en Safari, tocá Compartir y elegí «Agregar a inicio».' : installEvt ? 'Se agrega a tu pantalla de inicio y abre sin barra del navegador.' : 'Si el botón no hace nada, abrí el menú ⋮ del navegador y elegí «Instalar app».';
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; installUI(); });
+window.addEventListener('appinstalled', () => { installEvt = null; installUI(); });
+$('#btnInstall').onclick = async () => {
+  if (installEvt) { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* cancelado */ } installEvt = null; installUI(); }
+  else alert(isIOS ? 'En Safari: tocá Compartir (cuadrado con flecha) y elegí «Agregar a inicio».' : 'Abrí el menú ⋮ del navegador y elegí «Instalar app» o «Agregar a la pantalla principal».');
+};
+$('#btnShareApp').onclick = async () => {
+  const data = { title: 'Appsign', text: 'Appsign: traductor de lengua de señas argentina (prototipo)', url: location.origin + '/' };
+  try {
+    if (navigator.share) await navigator.share(data);
+    else if (navigator.clipboard) { await navigator.clipboard.writeText(data.url); $('#installMsg').textContent = 'Link copiado: pegalo donde quieras compartirlo.'; }
+    else prompt('Copiá el link:', data.url);
+  } catch (e) { /* cancelado */ }
+};
+
 // ---------- Navegación ----------
 function updateUI() {
   const showStage = mode && (tab === 'translate' || tab === 'converse');
@@ -672,7 +697,7 @@ $('#btnCam').onclick = () => (mode === 'camera' ? stopSource() : startCamera());
 
 // ---------- Inicio ----------
 (async function init() {
-  loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); renderTranscript(); updateUI();
+  loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); installUI(); renderTranscript(); updateUI();
   await loadLibrary();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   window.__lsa = { get lib() { return lib; }, get phrases() { return phrases; }, transcript, renderTranscript, get meta() { return libMeta; }, S, rank, prepare, resample };
