@@ -53,7 +53,7 @@ button.ghost{background:transparent}
 .tag.hear{background:color-mix(in srgb,var(--ok) 22%,transparent);color:var(--ok)}
 .who{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .who button{min-height:36px;padding:6px 12px;font-size:.85rem}
-#cvSign.flip .rot{transform:rotate(180deg)}
+
 button.ok{background:var(--ok);color:var(--ok-ink);border-color:var(--ok);font-weight:700}
 button.bad{color:var(--bad)}
 button.big-btn{flex:1;min-width:160px;font-size:1.05rem;padding:14px 16px}
@@ -140,37 +140,33 @@ a{color:var(--acc)}
 
   <!-- CONVERSAR -->
   <section id="tab-converse">
-    <p class="mut hint" id="cvMsg">Apoyá el celular en la mesa, apuntando a la persona sorda. La app escucha a quien habla y mira las señas, y escribe las dos cosas.</p>
-    <button id="cvStart" class="pri wide">Empezar conversación</button>
-    <button id="cvStop" class="wide" style="display:none">Terminar conversación</button>
+    <p class="mut hint">Cada persona usa la app en su propio celular, sin conectarlos. Elegí lo que necesitás; podés usar las dos cosas a la vez.</p>
 
-    <div class="card" id="cvVoice">
-      <span class="tag deaf">Para la persona sorda</span>
-      <h3><span class="mic" id="micDot"></span>Lo que dice quien oye</h3>
+    <div class="card">
+      <span class="tag hear">Soy oyente</span>
+      <h3>Entender las señas de la otra persona</h3>
+      <p class="mut">Apuntá la cámara a la persona sorda. Lo que seña se escribe acá abajo.</p>
+      <button id="cvCamBtn" class="pri wide">Activar cámara</button>
+      <div id="cvStageSlot"></div>
+      <div id="cvCamMsg" class="mut" role="status" aria-live="polite"></div>
+      <div id="cvSignLog" class="big"></div>
+      <div id="cvAlt" class="row"></div>
+    </div>
+
+    <div class="card">
+      <span class="tag deaf">Soy una persona sorda</span>
+      <h3>Leer lo que me dicen</h3>
+      <p class="mut">Apoyá tu celular cerca de quien habla. Lo que dice se escribe acá, con letra grande, sin leer los labios.</p>
+      <button id="cvMicBtn" class="pri wide"><span class="mic" id="micDot"></span>Activar micrófono</button>
+      <div id="cvMicMsg" class="mut" role="status" aria-live="polite"></div>
       <div id="cvVoiceLog" class="big"></div>
       <div id="cvInterim" class="big mut" style="min-height:0"></div>
     </div>
 
-    <div class="card" id="cvSign">
-      <div class="who">
-        <span class="tag hear">Para quien oye</span>
-        <button id="cvFlipBtn" class="ghost" aria-pressed="false" title="Gira este cuadro para leerlo desde el otro lado de la mesa">Girar cuadro</button>
-      </div>
-      <div class="rot">
-        <h3>Lo que seña la persona sorda</h3>
-        <div id="cvSignLog" class="big"></div>
-        <div id="cvAlt" class="row"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <label for="cvType">Responder escribiendo (la app lo dice en voz alta)</label>
-      <input type="text" id="cvType" placeholder="Escribí acá y tocá Decir">
-      <div class="row"><button id="cvSay" class="ok">Decir en voz alta</button><button id="cvClear" class="ghost">Borrar todo</button></div>
-    </div>
     <div class="card">
       <label for="cvSize">Tamaño de letra</label>
       <input type="range" id="cvSize" min="18" max="64" value="32" style="width:100%">
+      <div class="row"><button id="cvClear" class="ghost">Borrar todo</button></div>
     </div>
     <p class="mut">Privacidad: el reconocimiento de voz del navegador (Chrome) envía el audio a Google para transcribirlo. Las señas se procesan en el teléfono y no se guarda ni se envía video.</p>
   </section>

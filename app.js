@@ -207,7 +207,7 @@ function handleFrame(ts, frame) {
     setStageMsg(transSeg.active ? `Capturando… ${transSeg.count} frames` : has ? 'Manos detectadas' : 'Esperando manos…');
     if (out) onTranslateSegment(out);
   } else if (tab === 'converse') {
-    if (!cvOn) return;
+    if (!cvCam) return;
     const out = transSeg.push(ts, frame);
     setStageMsg(transSeg.active ? `Capturando seña… ${transSeg.count}` : has ? 'Manos detectadas' : 'Esperando señas…');
     if (out) onConverseSegment(out);
@@ -325,15 +325,15 @@ $('#setLefty').onchange = e => { S.lefty = e.target.checked; saveS(); };
 $('#setSpeak').onchange = e => { S.speak = e.target.checked; saveS(); };
 
 // ---------- Conversar ----------
-let cvOn = false, recog = null, micOn = false;
+// Dos funciones independientes en el mismo celular: señas -> texto (cámara, para quien oye) y voz -> texto (micrófono, para la persona sorda).
+let cvCam = false, recog = null, micOn = false;
 const voiceLines = [], signLines = []; // signLines: [{t, words:[]}]
 let cvLast = null;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 function cvRender() {
-  const esc2 = esc;
-  $('#cvVoiceLog').innerHTML = voiceLines.slice(-6).map(t => `<p class="ln">${esc2(t)}</p>`).join('');
-  $('#cvSignLog').innerHTML = signLines.slice(-6).map(l => `<p class="ln">${l.words.map(w => w || '¿?').map(esc2).join(' ')}</p>`).join('');
+  $('#cvVoiceLog').innerHTML = voiceLines.slice(-6).map(t => `<p class="ln">${esc(t)}</p>`).join('');
+  $('#cvSignLog').innerHTML = signLines.slice(-6).map(l => `<p class="ln">${l.words.map(w => w || '¿?').map(esc).join(' ')}</p>`).join('');
   const alt = $('#cvAlt'); alt.innerHTML = '';
   if (cvLast && cvLast.ranks.length) {
     cvLast.ranks.slice(0, 3).forEach(r => {
@@ -345,14 +345,13 @@ function cvRender() {
 }
 function cvApplySettings() {
   $('#tab-converse').style.setProperty('--cvsize', S.cvSize + 'px');
-  $('#cvSize').value = S.cvSize; $('#cvSign').classList.toggle('flip', S.cvFlip); $('#cvFlipBtn').setAttribute('aria-pressed', S.cvFlip); $('#cvFlipBtn').textContent = S.cvFlip ? 'Volver a enderezar' : 'Girar cuadro';
+  $('#cvSize').value = S.cvSize;
 }
 $('#cvSize').oninput = e => { S.cvSize = +e.target.value; saveS(); cvApplySettings(); };
-$('#cvFlipBtn').onclick = () => { S.cvFlip = !S.cvFlip; saveS(); cvApplySettings(); };
 
 function onConverseSegment(res) {
   if (!res.ok) return;
-  if (!lib.length) { $('#cvMsg').textContent = 'Todavía no hay vocabulario cargado en esta versión de la app.'; return; }
+  if (!lib.length) { $('#cvCamMsg').textContent = 'Todavía no hay vocabulario cargado en esta versión de la app.'; return; }
   const ranks = rank(prepare(resample(res.frames)), lib), thr = threshold();
   const word = ranks[0].dist <= thr ? ranks[0].word : null;
   const now = Date.now();
@@ -365,7 +364,7 @@ function onConverseSegment(res) {
 
 function addSpeech(text) { if (text) { voiceLines.push(text); cvRender(); } }
 function startMic() {
-  if (!SR) { $('#cvMsg').textContent = 'Este navegador no trae reconocimiento de voz: la parte de señas funciona igual. Para voz usá Chrome en Android o en computadora.'; return false; }
+  if (!SR) { $('#cvMicMsg').textContent = 'Este navegador no trae reconocimiento de voz. Probá con Chrome en Android o en computadora.'; return false; }
   recog = new SR(); recog.lang = 'es-AR'; recog.continuous = true; recog.interimResults = true;
   recog.onresult = e => {
     if (speakingNow) return;
@@ -379,32 +378,37 @@ function startMic() {
   recog.onend = () => { if (micOn) { try { recog.start(); } catch (e) { /* ya activo */ } } };
   recog.onerror = e => {
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-      micOn = false; $('#micDot').classList.remove('on');
-      $('#cvMsg').textContent = 'Sin permiso para el micrófono. Habilitalo en el navegador para ver lo que dice la otra persona.';
+      micOn = false; $('#micDot').classList.remove('on'); micBtnUI();
+      $('#cvMicMsg').textContent = 'Sin permiso para el micrófono. Habilitalo en el navegador para ver lo que dicen.';
     }
   };
   micOn = true;
-  try { recog.start(); } catch (e) { return false; }
+  try { recog.start(); } catch (e) { micOn = false; return false; }
   $('#micDot').classList.add('on');
   return true;
 }
-function stopMic() { micOn = false; try { recog && recog.stop(); } catch (e) { /* nada */ } $('#micDot').classList.remove('on'); $('#cvInterim').textContent = ''; }
-function converseStop() {
-  if (!cvOn && !micOn) return;
-  cvOn = false; stopMic();
-  $('#cvStart').style.display = ''; $('#cvStop').style.display = 'none';
+function stopMic() { micOn = false; try { recog && recog.stop(); } catch (e) { /* nada */ } $('#micDot').classList.remove('on'); $('#cvInterim').textContent = ''; micBtnUI(); }
+function micBtnUI() {
+  $('#cvMicBtn').lastChild.textContent = micOn ? 'Apagar micrófono' : 'Activar micrófono';
+  $('#cvMicBtn').className = micOn ? 'wide' : 'pri wide';
+  if (micOn) $('#cvMicMsg').textContent = 'Escuchando… lo que digan aparece acá.';
 }
-$('#cvStart').onclick = async () => {
-  cvOn = true; $('#cvStart').style.display = 'none'; $('#cvStop').style.display = '';
-  $('#cvMsg').textContent = 'Escuchando y mirando. Hablá o señá con las manos en cuadro.';
-  startMic();
+function camBtnUI() {
+  $('#cvCamBtn').textContent = cvCam ? 'Apagar cámara' : 'Activar cámara';
+  $('#cvCamBtn').className = cvCam ? 'wide' : 'pri wide';
+}
+function converseStop() {
+  if (cvCam) { cvCam = false; camBtnUI(); }
+  if (micOn) stopMic();
+}
+$('#cvCamBtn').onclick = async () => {
+  if (cvCam) { cvCam = false; await stopSource(); camBtnUI(); $('#cvCamMsg').textContent = ''; return; }
+  cvCam = true; camBtnUI(); $('#cvCamMsg').textContent = 'Mirando… poné las manos de la persona en cuadro y bajalas entre una seña y otra.';
   await startCamera();
+  if (mode !== 'camera') { cvCam = false; camBtnUI(); }
 };
-$('#cvStop').onclick = () => { converseStop(); stopSource(); $('#cvMsg').textContent = 'Conversación terminada.'; };
+$('#cvMicBtn').onclick = () => { if (micOn) stopMic(); else { if (startMic()) micBtnUI(); } };
 $('#cvClear').onclick = () => { voiceLines.length = 0; signLines.length = 0; cvLast = null; cvRender(); };
-$('#cvSay').onclick = () => { const v = $('#cvType').value.trim(); if (v) { speak(v); voiceLines.push('Tú: ' + v); cvRender(); $('#cvType').value = ''; } };
-$('#cvType').addEventListener('keydown', e => { if (e.key === 'Enter') $('#cvSay').click(); });
-
 
 // ---------- Grabar video con subtítulos para compartir ----------
 // Se dibuja cámara + subtítulos en un canvas y se graba ese canvas. Nada se sube: se comparte desde el celular.
@@ -504,6 +508,7 @@ function updateUI() {
 function showTab(name) {
   tab = name; transSeg.reset();
   if (name !== 'converse') converseStop();
+  (name === 'converse' ? $('#cvStageSlot') : $('main')).insertBefore(stage, name === 'converse' ? null : $('#tab-translate'));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
   document.querySelectorAll('main > section').forEach(s => s.classList.toggle('on', s.id === 'tab-' + name));
   if (name === 'collab' || name === 'data') { if (mode) stopSource(); }
@@ -514,7 +519,7 @@ $('#btnCam').onclick = () => (mode === 'camera' ? stopSource() : startCamera());
 
 // ---------- Inicio ----------
 (async function init() {
-  loadSettingsUI(); cvApplySettings(); cvRender(); renderTranscript(); updateUI();
+  loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); renderTranscript(); updateUI();
   await loadLibrary();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   window.__lsa = { get lib() { return lib; }, get meta() { return libMeta; }, S, rank, prepare, resample };
