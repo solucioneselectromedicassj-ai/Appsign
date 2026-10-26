@@ -27,3 +27,11 @@ Más adelante, con un servidor, el envío puede ser automático.
 - Guardar una lista de frases frecuentes (las que ya aparecen como subtítulos en los videos, ej.: «quiero informar», «es importante», «hay señas»).
 - Si la app reconoce el principio y el final de una frase y en el medio hay palabras dudosas (¿?), proponer «¿Quisiste decir…?» con la frase completa y que la persona confirme.
 - Conviene empezar cuando haya más palabras con 3 o más repeticiones; la lista de frases se cargaría desde el Constructor dentro de `library.json`.
+
+## Hallazgos de las pruebas (octubre 2026)
+- Entre dos personas distintas, la misma seña queda más lejos (0,29 a 0,41) que dos señas distintas de la misma persona (mediana 0,20). Con 1 muestra por persona, la app reconoce bien a quien grabó y mal a los demás. Lo que lo arregla: **3 o más repeticiones de varias personas**.
+- Sumar la posición respecto del cuerpo (hombros/nariz) o de la cara (nariz, anchos de cara) EMPEORÓ la comparación entre personas con los datos actuales; no está en la app. Volver a medir con más personas; probar «¿la mano toca la cabeza?» como sí/no y entrenar un modelo con más datos.
+- Solo 10 de 63 señas pasan más de la mitad del tiempo cerca de la cara.
+- La lectura continua (Spotter) acierta más que cortar cuando bajan las manos (76 contra 68 de 103 señas, con 19 contra 31 equivocadas), medido con los mismos videos.
+- Ayuda de encuadre: la cara ocupa entre 0,16 y 0,34 del ancho y queda en el tercio de arriba en los videos que mejor funcionaron.
+- Pendiente: modo deletreo (solo nombres propios), guía de grabación para la asociación (30 a 50 palabras, 3 repeticiones, medio cuerpo, fondo liso), rasgos no manuales (cejas, boca, cabeza) medidos con las preguntas de los videos.

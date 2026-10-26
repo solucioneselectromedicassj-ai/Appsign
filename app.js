@@ -14,7 +14,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Ajustes ----------
-const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'blue', help: false, cue: true };
+const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'blue', help: false, cue: true, guide: true };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
 if (!S.v) { S.cvFlip = false; S.v = 2; }
@@ -78,12 +78,12 @@ const stage = $('#stage'), video = $('#video'), overlay = $('#overlay'), octx = 
 function setStatus(t, cls = '') { const p = $('#status'); p.textContent = t; p.className = 'pill ' + cls; }
 
 // ---------- Modelo y cámara ----------
-let landmarker = null, mode = null, stream = null, running = false;
+let landmarker = null, mode = null, stream = null, running = false, mpKit = null;
 
 // Primero los archivos propios (carpeta mp/, funcionan sin internet); si faltan, el CDN.
 const MP_SOURCES = [
-  { label: 'archivos propios', mod: './mp/vision_bundle.mjs', wasm: 'mp/wasm', model: 'mp/hand_landmarker.task' },
-  { label: 'CDN', mod: MP_URL, wasm: WASM_URL, model: MODEL_URL },
+  { label: 'archivos propios', mod: './mp/vision_bundle.mjs', wasm: 'mp/wasm', model: 'mp/hand_landmarker.task', face: 'mp/blaze_face_short_range.tflite' },
+  { label: 'CDN', mod: MP_URL, wasm: WASM_URL, model: MODEL_URL, face: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite' },
 ];
 
 async function loadModel() {
@@ -102,6 +102,7 @@ async function loadModel() {
         minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.6, minTrackingConfidence: 0.5,
       });
       try { landmarker = await mk('GPU'); } catch (e) { landmarker = await mk('CPU'); }
+      mpKit = { mp, fs, src };
       setStatus('Reconocedor listo', 'ok');
       return;
     } catch (e) { fails.push(`${src.label} (${step}): ${e.message || e.name}`); }
@@ -114,7 +115,7 @@ async function stopSource() {
   running = false;
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   video.pause(); video.removeAttribute('src'); video.srcObject = null; video.controls = false;
-  mode = null; lastMsg = '';
+  mode = null; lastMsg = ''; guideSt.noFace = 0; guideSt.cuts = []; guideSt.okUntil = 0; setGuide('', '');
   octx.clearRect(0, 0, overlay.width, overlay.height);
   spotter.reset();
   updateUI();
@@ -164,6 +165,7 @@ function tick() {
   try { res = landmarker.detectForVideo(video, ts); } catch (e) { console.warn(e); return; }
   const raw = toFrame(res);
   drawLive(raw);
+  guideStep(ts, raw);
   handleFrame(ts, S.lefty ? mirrorFrame(raw) : raw);
 }
 
@@ -230,6 +232,53 @@ function judgeRanks(ranks) {
   const accepted = ranks[0].dist <= thr;
   const margin = ranks[1] ? ranks[1].dist - ranks[0].dist : 1;
   return { ranks, thr, accepted, doubt: !accepted || margin < 0.03 };
+}
+
+// ---------- Ayuda de encuadre: avisa a quien sostiene el celular cómo acomodarlo ----------
+// Rangos tomados de los videos que mejor funcionaron: la cara ocupa entre 0,16 y 0,34 del ancho y queda en el tercio de arriba.
+let faceDet = null, faceTs = 0, faceN = 0, faceTry = false;
+const guideSt = { noFace: 0, cuts: [], okUntil: 0, last: '' };
+async function ensureFaceDet() {
+  if (faceDet || faceTry || !mpKit || !mpKit.mp.FaceDetector) return;
+  faceTry = true;
+  try { faceDet = await mpKit.mp.FaceDetector.createFromOptions(mpKit.fs, { baseOptions: { modelAssetPath: mpKit.src.face, delegate: 'CPU' }, runningMode: 'VIDEO', minDetectionConfidence: 0.5 }); } catch (e) { console.warn('detector de cara:', e.message); }
+}
+function setGuide(txt, kind) {
+  const el = $('#guide'); if (guideSt.last === txt + kind) return; guideSt.last = txt + kind;
+  el.textContent = txt; el.dataset.kind = kind || ''; el.style.display = txt ? '' : 'none';
+}
+function guideStep(ts, raw) {
+  if (!S.guide || !(tab === 'translate' || (tab === 'converse' && cvCam))) { setGuide('', ''); return; }
+  for (let slot = 0; slot < 2; slot++) {
+    if (!presentSlot(raw, slot)) continue;
+    let out = 0; const b = slot * HAND_LEN;
+    for (let p = 0; p < 21; p++) { const x = raw[b + p * 3], y = raw[b + p * 3 + 1]; if (x < 0.01 || x > 0.99 || y < 0.01 || y > 0.99) out++; }
+    guideSt.cuts.push({ t: ts, cut: out >= 3 });
+  }
+  while (guideSt.cuts.length && guideSt.cuts[0].t < ts - 3000) guideSt.cuts.shift();
+  if (++faceN % 6) return;
+  ensureFaceDet();
+  let fw = null, ny = null;
+  if (faceDet && video.videoWidth) {
+    try {
+      faceTs = Math.max(faceTs + 1, ts);
+      const d = (faceDet.detectForVideo(video, faceTs).detections || [])[0];
+      if (d) { fw = d.boundingBox.width / video.videoWidth; const kp = d.keypoints && d.keypoints[2]; ny = kp ? kp.y : (d.boundingBox.originY + d.boundingBox.height * 0.55) / video.videoHeight; }
+    } catch (e) { /* sin detección */ }
+  }
+  const cutRatio = guideSt.cuts.length >= 8 ? guideSt.cuts.filter(c => c.cut).length / guideSt.cuts.length : 0;
+  let msg = '';
+  if (fw == null) { if (!guideSt.noFace) guideSt.noFace = ts; if (faceDet && ts - guideSt.noFace > 1500) msg = 'Encuadrá a la persona de la cabeza a la cintura'; }
+  else guideSt.noFace = 0;
+  if (fw != null) {
+    if (fw < 0.16) msg = 'Acercate un poco';
+    else if (fw > 0.34) msg = 'Alejate un poco';
+    else if (ny > 0.5) msg = 'Inclinalo hacia abajo: la cara tiene que quedar arriba';
+    else if (ny < 0.1) msg = 'Inclinalo hacia arriba';
+  }
+  if (!msg && cutRatio > 0.3) msg = 'Alejate o dejá más lugar: las manos se salen del cuadro';
+  if (msg) { setGuide(msg, 'warn'); guideSt.okUntil = 0; }
+  else if (fw != null) { if (!guideSt.okUntil) guideSt.okUntil = ts + 2500; setGuide(ts < guideSt.okUntil ? 'Buen encuadre ✓' : '', 'ok'); }
 }
 
 // ---------- Segmentación y consumidores ----------
@@ -451,7 +500,7 @@ document.querySelectorAll('button[data-accent]').forEach(b => b.onclick = () => 
 
 // ---------- Ajustes ----------
 function loadSettingsUI() {
-  applyLook(); $('#setHelp').checked = S.help; $('#setCue').checked = S.cue; corrUI();
+  applyLook(); $('#setGuide').checked = S.guide; $('#setHelp').checked = S.help; $('#setCue').checked = S.cue; corrUI();
   $('#setFacing').value = S.facing; $('#setAuto').checked = S.auto; $('#setThr').value = S.thr; $('#setLefty').checked = S.lefty; $('#setSpeak').checked = S.speak;
   updateThrLabel();
 }
@@ -459,6 +508,7 @@ function updateThrLabel() { $('#thrVal').textContent = S.auto ? 'automática' : 
 $('#setFacing').onchange = e => { S.facing = e.target.value; saveS(); if (mode === 'camera') startCamera(); else updateUI(); };
 $('#setAuto').onchange = e => { S.auto = e.target.checked; saveS(); updateThrLabel(); renderLibInfo(); syncSpotter(); };
 $('#setThr').oninput = e => { S.thr = +e.target.value; saveS(); updateThrLabel(); syncSpotter(); };
+$('#setGuide').onchange = e => { S.guide = e.target.checked; saveS(); if (S.guide) ensureFaceDet(); else setGuide('', ''); };
 $('#setHelp').onchange = e => { S.help = e.target.checked; saveS(); corrUI(); };
 $('#setCue').onchange = e => { S.cue = e.target.checked; saveS(); };
 $('#setLefty').onchange = e => { S.lefty = e.target.checked; saveS(); };

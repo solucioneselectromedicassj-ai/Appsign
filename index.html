@@ -40,6 +40,8 @@ section{display:none} section.on{display:block;animation:in .18s ease-out}
 #stage video,#stage canvas#overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 #stage canvas#overlay{pointer-events:none}
 #stage.mirror video,#stage.mirror canvas#overlay{transform:scaleX(-1)}
+#guide{position:absolute;left:10px;right:10px;bottom:48px;text-align:center;color:#fff;font-weight:700;font-size:.95rem;background:#d97706e6;padding:7px 12px;border-radius:12px;pointer-events:none}
+#guide[data-kind=ok]{background:#059669e6}
 #stageMsg{position:absolute;left:10px;bottom:10px;right:10px;font-size:.82rem;color:#fff;background:#000a;padding:5px 10px;border-radius:10px;pointer-events:none;width:fit-content;max-width:calc(100% - 20px)}
 .stage-tools{position:absolute;top:10px;right:10px;display:flex;gap:8px}
 .ibtn{width:44px;height:44px;padding:0;border-radius:50%;display:grid;place-items:center;background:#000a;border:1px solid #fff3;color:#fff}
@@ -137,6 +139,7 @@ a{color:var(--acc)}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h4l2-3h6l2 3h4v12H3z"/><path d="M9 13a3 3 0 0 1 5-2l1 1M15 14a3 3 0 0 1-5 2l-1-1"/></svg>
       </button>
     </div>
+    <div id="guide" class="guide" style="display:none"></div>
     <div id="stageMsg">Cámara apagada</div>
   </div>
 
@@ -275,6 +278,7 @@ a{color:var(--acc)}
       <input type="range" id="setThr" min="0.02" max="1.5" step="0.01" style="width:100%">
       <label class="chk"><input type="checkbox" id="setLefty"> <span>Seño con la mano izquierda (espejar)</span></label>
       <label class="chk"><input type="checkbox" id="setSpeak"> <span>Leer en voz alta cada palabra reconocida</span></label>
+      <label class="chk"><input type="checkbox" id="setGuide" checked> <span>Ayuda de encuadre: avisa si conviene acercarse, alejarse o inclinar el celular</span></label>
       <label class="chk"><input type="checkbox" id="setCue" checked> <span>Avisar con vibración y un sonido suave cuando termina de leer una seña (para no tener que mirar la pantalla)</span></label>
       <label class="chk"><input type="checkbox" id="setHelp"> <span>Ayudar a mejorar la app: guardar en mi celular las señas que confirmo o corrijo (solo los puntos de las manos, sin video ni cara). Las mando yo al equipo desde Colaborar.</span></label>
     </div>
