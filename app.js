@@ -99,6 +99,7 @@ async function loadModel() {
       step = 'modelo';
       const mk = delegate => mp.HandLandmarker.createFromOptions(fs, {
         baseOptions: { modelAssetPath: src.model, delegate }, runningMode: 'VIDEO', numHands: 2,
+        minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.6, minTrackingConfidence: 0.5,
       });
       try { landmarker = await mk('GPU'); } catch (e) { landmarker = await mk('CPU'); }
       setStatus('Reconocedor listo', 'ok');
@@ -255,18 +256,18 @@ function onTranslateSegment(res) {
   const q16 = resample(res.frames);
   if (!lib.length) { last = { ranks: [], accepted: false, note: 'Todavía no hay vocabulario cargado en esta versión de la app.' }; renderLast(); return; }
   const j = judge(q16);
-  transcript.push({ word: j.accepted ? j.ranks[0].word : null, cands: j.ranks.slice(0, 3).map(r => r.word) });
+  transcript.push({ word: j.accepted ? j.ranks[0].word : null, doubt: j.doubt && j.accepted, cands: j.ranks.slice(0, 3).map(r => r.word) });
   last = { ...j, q16, idx: transcript.length - 1 };
   renderTranscript(); renderLast();
   if (tip) { setStageMsg(tip, 3500); cue('warn'); }
   else if (j.doubt) { setStageMsg('No estoy seguro/a: mirá abajo y comparalo con la persona', 3500); cue('doubt'); }
   else { setStageMsg('✓ ' + j.ranks[0].word + ' — pedile la próxima', 2500); cue('ok'); }
-  if (j.accepted && S.speak) speak(j.ranks[0].word);
+  if (j.accepted && !j.doubt && S.speak) speak(j.ranks[0].word);
 }
 
 // Confirmar o corregir la palabra de la última seña (y, si la persona lo activó, guardar la corrección para el equipo)
 function labelLast(word) {
-  if (last && last.idx != null) { transcript[last.idx].word = word; transcript[last.idx].cands = [word]; renderTranscript(); }
+  if (last && last.idx != null) { transcript[last.idx].word = word; transcript[last.idx].doubt = false; transcript[last.idx].cands = [word]; renderTranscript(); }
   if (last) saveCorrection(word, last.q16);
 }
 
@@ -274,7 +275,7 @@ function renderTranscript() {
   const el = $('#transcript');
   renderPhrase();
   if (!transcript.length) { el.innerHTML = '<span class="mut">Poné las manos en cuadro, hacé la seña y bajalas.</span>'; return; }
-  el.innerHTML = transcript.map((t, i) => `<span class="chip ${t.phrase ? 'phrase' : t.word ? '' : 'unk'} ${i === transcript.length - 1 ? 'last' : ''}">${t.phrase ? esc(t.phrase) : t.word ? esc(t.word) : '¿?'}</span>`).join('');
+  el.innerHTML = transcript.map((t, i) => `<span class="chip ${t.phrase ? 'phrase' : t.word && !t.doubt ? '' : 'unk'} ${i === transcript.length - 1 ? 'last' : ''}">${t.phrase ? esc(t.phrase) : t.word ? (t.doubt ? '¿' + esc(t.word) + '?' : esc(t.word)) : '¿?'}</span>`).join('');
 }
 
 // Prototipo de frases: si las últimas señas encajan con una frase de la lista del equipo, se propone completarla
@@ -387,7 +388,7 @@ $('#corrSend').onclick = async () => {
 };
 
 $('#btnClear').onclick = () => { transcript.length = 0; last = null; renderTranscript(); renderLast(); };
-$('#btnSpeak').onclick = () => speak(transcript.map(t => t.phrase || t.word).filter(Boolean).join(' '));
+$('#btnSpeak').onclick = () => speak(transcript.map(t => t.phrase || (t.doubt ? '' : t.word)).filter(Boolean).join(' '));
 function speak(text) {
   if (!text || !('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(text); u.lang = 'es-AR';
@@ -503,7 +504,7 @@ function onConverseSegment(res) {
   if (!res.ok) { setStageMsg(tip, 3500); cue('warn'); return; }
   if (!lib.length) { $('#cvCamMsg').textContent = 'Todavía no hay vocabulario cargado en esta versión de la app.'; return; }
   const q16 = resample(res.frames), j = judge(q16);
-  const word = j.accepted ? j.ranks[0].word : null;
+  const word = j.accepted ? (j.doubt ? '¿' + j.ranks[0].word + '?' : j.ranks[0].word) : null;
   const now = Date.now();
   let line = signLines[signLines.length - 1];
   if (!line || now - line.t > 4000) { line = { t: now, words: [] }; signLines.push(line); }
@@ -574,7 +575,7 @@ function subtitleLines() {
     const sl = signLines[signLines.length - 1];
     return [sl ? sl.words.map(w => w || '¿?').join(' ') : '', v].filter(Boolean);
   }
-  return [transcript.slice(-8).map(t => t.phrase || t.word || '¿?').join(' ')].filter(Boolean);
+  return [transcript.slice(-8).map(t => t.phrase || (t.word ? (t.doubt ? '¿' + t.word + '?' : t.word) : '¿?')).join(' ')].filter(Boolean);
 }
 
 function wrapText(ctx, text, maxW) {
