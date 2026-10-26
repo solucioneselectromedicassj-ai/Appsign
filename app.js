@@ -1,4 +1,4 @@
-import { T, FRAME_LEN, HAND_LEN, Segmenter, resample, prepare, rank, mirrorFrame, anyPresent, presentSlot, normWord, autoThreshold, suggestPhrase } from './core.js';
+import { T, FRAME_LEN, HAND_LEN, Segmenter, resample, prepare, rank, mirrorFrame, anyPresent, presentSlot, normWord, autoThreshold, suggestPhrase, Spotter } from './core.js';
 import { CONFIG } from './config.js';
 
 // ---------- Configuración ----------
@@ -43,7 +43,7 @@ async function loadLibrary() {
     libMeta = { version: String(d.version || ''), words: new Set(lib.map(s => s.word)).size, validated: d.validated !== false, threshold: Number(d.threshold) > 0 ? Number(d.threshold) : 0 };
     phrases = (Array.isArray(d.phrases) ? d.phrases : []).map(p => ({ signs: (p.signs || []).map(normWord).filter(Boolean), text: String(p.text || '').trim() })).filter(p => p.signs.length >= 2 && p.text);
   } catch (e) { lib = []; phrases = []; libMeta = { version: '', words: 0, validated: true }; console.warn('library.json:', e.message); }
-  thrMemo = null;
+  thrMemo = null; syncSpotter();
   announceUpdate();
   renderLibInfo();
 }
@@ -116,7 +116,7 @@ async function stopSource() {
   video.pause(); video.removeAttribute('src'); video.srcObject = null; video.controls = false;
   mode = null; lastMsg = '';
   octx.clearRect(0, 0, overlay.width, overlay.height);
-  transSeg.reset();
+  spotter.reset();
   updateUI();
 }
 
@@ -225,42 +225,38 @@ function coachFor(res) {
   return null;
 }
 // Compara contra el vocabulario y dice si hay duda (no alcanza el parecido, o dos palabras casi empatan)
-function judge(q16) {
-  const ranks = rank(prepare(q16), lib), thr = threshold();
+function judgeRanks(ranks) {
+  const thr = threshold();
   const accepted = ranks[0].dist <= thr;
   const margin = ranks[1] ? ranks[1].dist - ranks[0].dist : 1;
   return { ranks, thr, accepted, doubt: !accepted || margin < 0.03 };
 }
 
 // ---------- Segmentación y consumidores ----------
-const transSeg = new Segmenter({ gapMs: 450, minFrames: 6, maxMs: 5000 });
+// Lectura continua: reconoce las señas aunque vayan seguidas o haya una mano apoyada en el cuadro
+const spotter = new Spotter();
+function syncSpotter() { spotter.setLibrary(lib, threshold()); }
 
-let segStart = 0;
 function handleFrame(ts, frame) {
   const has = anyPresent(frame);
   if (!(tab === 'translate' || (tab === 'converse' && cvCam))) return;
-  const was = transSeg.active;
-  const out = transSeg.push(ts, frame);
-  if (!was && transSeg.active) segStart = ts;
-  setStageMsg(transSeg.active ? (ts - segStart > 3500 ? 'Bajá las manos para terminar' : 'Mirando la seña…') : has ? 'Manos detectadas' : 'Listo: pedile una seña');
-  if (out) { out.dur = ts - segStart; (tab === 'translate' ? onTranslateSegment : onConverseSegment)(out); }
+  const evs = spotter.push(ts, frame);
+  setStageMsg(has ? 'Mirando…' : 'Listo: pedile una seña');
+  for (const e of evs) (tab === 'translate' ? onTranslateEvent : onConverseEvent)(e);
 }
 
 // ---------- Traducir ----------
 const transcript = [];
 let last = null;
 
-function onTranslateSegment(res) {
-  const tip = coachFor(res);
-  if (!res.ok) { setStageMsg(tip, 3500); cue('warn'); return; }
-  const q16 = resample(res.frames);
+function onTranslateEvent(e) {
+  if (e.kind === 'short') { setStageMsg('Muy corta o muy rápida: pedile que la haga más lento', 3500); cue('warn'); return; }
   if (!lib.length) { last = { ranks: [], accepted: false, note: 'Todavía no hay vocabulario cargado en esta versión de la app.' }; renderLast(); return; }
-  const j = judge(q16);
+  const j = judgeRanks(e.ranks);
   transcript.push({ word: j.accepted ? j.ranks[0].word : null, doubt: j.doubt && j.accepted, cands: j.ranks.slice(0, 3).map(r => r.word) });
-  last = { ...j, q16, idx: transcript.length - 1 };
+  last = { ...j, q16: e.q16, idx: transcript.length - 1 };
   renderTranscript(); renderLast();
-  if (tip) { setStageMsg(tip, 3500); cue('warn'); }
-  else if (j.doubt) { setStageMsg('No estoy seguro/a: mirá abajo y comparalo con la persona', 3500); cue('doubt'); }
+  if (j.doubt) { setStageMsg('No estoy seguro/a: mirá abajo y comparalo con la persona', 3500); cue('doubt'); }
   else { setStageMsg('✓ ' + j.ranks[0].word + ' — pedile la próxima', 2500); cue('ok'); }
   if (j.accepted && !j.doubt && S.speak) speak(j.ranks[0].word);
 }
@@ -461,8 +457,8 @@ function loadSettingsUI() {
 }
 function updateThrLabel() { $('#thrVal').textContent = S.auto ? 'automática' : S.thr.toFixed(2); $('#setThr').disabled = S.auto; }
 $('#setFacing').onchange = e => { S.facing = e.target.value; saveS(); if (mode === 'camera') startCamera(); else updateUI(); };
-$('#setAuto').onchange = e => { S.auto = e.target.checked; saveS(); updateThrLabel(); renderLibInfo(); };
-$('#setThr').oninput = e => { S.thr = +e.target.value; saveS(); updateThrLabel(); };
+$('#setAuto').onchange = e => { S.auto = e.target.checked; saveS(); updateThrLabel(); renderLibInfo(); syncSpotter(); };
+$('#setThr').oninput = e => { S.thr = +e.target.value; saveS(); updateThrLabel(); syncSpotter(); };
 $('#setHelp').onchange = e => { S.help = e.target.checked; saveS(); corrUI(); };
 $('#setCue').onchange = e => { S.cue = e.target.checked; saveS(); };
 $('#setLefty').onchange = e => { S.lefty = e.target.checked; saveS(); };
@@ -499,20 +495,18 @@ function cvApplySettings() {
 }
 $('#cvSize').oninput = e => { S.cvSize = +e.target.value; saveS(); cvApplySettings(); };
 
-function onConverseSegment(res) {
-  const tip = coachFor(res);
-  if (!res.ok) { setStageMsg(tip, 3500); cue('warn'); return; }
+function onConverseEvent(e) {
+  if (e.kind === 'short') { setStageMsg('Muy corta o muy rápida: pedile que la haga más lento', 3500); cue('warn'); return; }
   if (!lib.length) { $('#cvCamMsg').textContent = 'Todavía no hay vocabulario cargado en esta versión de la app.'; return; }
-  const q16 = resample(res.frames), j = judge(q16);
+  const j = judgeRanks(e.ranks);
   const word = j.accepted ? (j.doubt ? '¿' + j.ranks[0].word + '?' : j.ranks[0].word) : null;
   const now = Date.now();
   let line = signLines[signLines.length - 1];
   if (!line || now - line.t > 4000) { line = { t: now, words: [] }; signLines.push(line); }
   line.t = now; line.words.push(word);
-  cvLast = { ranks: j.ranks, doubt: j.doubt, line, idx: line.words.length - 1, q16 };
+  cvLast = { ranks: j.ranks, doubt: j.doubt, line, idx: line.words.length - 1, q16: e.q16 };
   cvRender();
-  if (tip) { setStageMsg(tip, 3500); cue('warn'); }
-  else if (j.doubt) { setStageMsg('No estoy seguro/a: comparalo con la persona', 3500); cue('doubt'); }
+  if (j.doubt) { setStageMsg('No estoy seguro/a: comparalo con la persona', 3500); cue('doubt'); }
   else { setStageMsg('✓ ' + word + ' — pedile la próxima', 2500); cue('ok'); }
 }
 
@@ -685,7 +679,7 @@ function updateUI() {
   if (!mode && rec) stopRecording();
 }
 function showTab(name) {
-  tab = name; transSeg.reset();
+  tab = name; spotter.reset();
   if (name !== 'converse') converseStop();
   (name === 'converse' ? $('#cvStageSlot') : $('main')).insertBefore(stage, name === 'converse' ? null : $('#tab-translate'));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));

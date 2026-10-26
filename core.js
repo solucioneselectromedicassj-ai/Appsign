@@ -199,3 +199,68 @@ export function suggestPhrase(entries, phrases) {
   }
   return best;
 }
+
+// Lectura continua: en vez de esperar a que las manos salgan del cuadro, compara cada 0,2 s los últimos 0,8 a 2,6 s
+// contra el vocabulario y avisa cuando una seña se reconoce con claridad. Sirve para señas seguidas y con una mano apoyada.
+// Eventos: {kind:'sign', ...}, {kind:'unknown', ...} (hubo movimiento pero nada se parece) o {kind:'short'} (muy corto).
+export class Spotter {
+  constructor({ lens = [0.8, 1.2, 1.8, 2.6], step = 0.2, hold = 0.5, minRatio = 0.7 } = {}) {
+    Object.assign(this, { lens, step, hold, minRatio });
+    this.lib = []; this.thr = 0.3; this.reset();
+  }
+  setLibrary(lib, thr) { this.lib = lib; this.thr = thr; }
+  reset() { this.buf = []; this.lastEval = -1e9; this.pending = null; this.lastEmit = null; this.runStart = null; this.absentSince = null; this.emitted = false; this.bestUnknown = null; }
+  _ov(a, b) { return Math.max(0, Math.min(a.t1, b.t1) - Math.max(a.t0, b.t0)); }
+  _eval(t) {
+    let best = null;
+    for (const len of this.lens) {
+      const win = this.buf.filter(x => x.t > t - len);
+      if (win.length < 6) continue;
+      if (win.filter(x => anyPresent(x.f)).length / win.length < this.minRatio) continue;
+      const fr = win.map(x => x.f);
+      while (fr.length && !anyPresent(fr[0])) fr.shift();
+      while (fr.length && !anyPresent(fr[fr.length - 1])) fr.pop();
+      if (fr.length < 6) continue;
+      const q16 = resample(fr), ranks = rank(prepare(q16), this.lib);
+      if (!ranks.length) continue;
+      const c = { t0: t - len, t1: t, word: ranks[0].word, dist: ranks[0].dist, ranks, q16 };
+      if (!best || c.dist < best.dist) best = c;
+    }
+    return best;
+  }
+  _sign(c) { this.lastEmit = { t0: c.t0, t1: c.t1 }; this.emitted = true; return { kind: 'sign', word: c.word, dist: c.dist, ranks: c.ranks, q16: c.q16, dur: (c.t1 - c.t0) * 1000 }; }
+  // t en milisegundos; devuelve una lista de eventos (casi siempre vacía)
+  push(tMs, frame) {
+    const t = tMs / 1000, has = anyPresent(frame), ev = [];
+    this.buf.push({ t, f: frame });
+    while (this.buf.length && this.buf[0].t < t - 3.2) this.buf.shift();
+    if (has) { if (this.runStart == null) { this.runStart = t; this.emitted = false; this.bestUnknown = null; } this.absentSince = null; }
+    else if (this.absentSince == null) this.absentSince = t;
+    if (this.lib.length && t - this.lastEval >= this.step && this.buf.some(x => x.t > t - 0.4 && anyPresent(x.f))) {
+      this.lastEval = t;
+      const c = this._eval(t);
+      if (c) {
+        if (!this.bestUnknown || c.dist < this.bestUnknown.dist) this.bestUnknown = c;
+        const dup = this.lastEmit && this._ov(c, this.lastEmit) > 0.4 * Math.min(c.t1 - c.t0, this.lastEmit.t1 - this.lastEmit.t0);
+        if (c.dist <= this.thr && !dup) {
+          if (!this.pending) this.pending = { c, at: t };
+          else if (this._ov(c, this.pending.c) > 0) { if (c.dist < this.pending.c.dist) this.pending = { c, at: t }; }
+          else { ev.push(this._sign(this.pending.c)); this.pending = { c, at: t }; }
+        }
+      }
+    }
+    if (this.pending && (t - this.pending.at >= this.hold || (this.absentSince != null && t - this.absentSince >= 0.3))) { ev.push(this._sign(this.pending.c)); this.pending = null; }
+    if (this.runStart != null) {
+      const gone = this.absentSince != null && t - this.absentSince >= 0.6, long = has && t - this.runStart > 5;
+      if (gone || long) {
+        const dur = (this.absentSince != null ? this.absentSince : t) - this.runStart;
+        if (!this.emitted) {
+          if (dur < 0.5) ev.push({ kind: 'short', dur: dur * 1000 });
+          else if (this.bestUnknown) ev.push({ kind: 'unknown', ranks: this.bestUnknown.ranks, q16: this.bestUnknown.q16, dist: this.bestUnknown.dist, dur: dur * 1000 });
+        }
+        this.runStart = gone ? null : t; this.emitted = false; this.bestUnknown = null; if (gone) this.lastEmit = null;
+      }
+    }
+    return ev;
+  }
+}
