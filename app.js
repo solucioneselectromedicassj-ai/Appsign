@@ -14,7 +14,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Ajustes ----------
-const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'blue', help: false, cue: true, guide: true };
+const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'blue', help: false, cue: true, guide: true, face: false };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
 if (!S.v) { S.cvFlip = false; S.v = 2; }
@@ -82,8 +82,8 @@ let landmarker = null, mode = null, stream = null, running = false, mpKit = null
 
 // Primero los archivos propios (carpeta mp/, funcionan sin internet); si faltan, el CDN.
 const MP_SOURCES = [
-  { label: 'archivos propios', mod: './mp/vision_bundle.mjs', wasm: 'mp/wasm', model: 'mp/hand_landmarker.task', face: 'mp/blaze_face_short_range.tflite' },
-  { label: 'CDN', mod: MP_URL, wasm: WASM_URL, model: MODEL_URL, face: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite' },
+  { label: 'archivos propios', mod: './mp/vision_bundle.mjs', wasm: 'mp/wasm', model: 'mp/hand_landmarker.task', face: 'mp/blaze_face_short_range.tflite', flm: 'mp/face_landmarker.task' },
+  { label: 'CDN', mod: MP_URL, wasm: WASM_URL, model: MODEL_URL, face: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite', flm: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task' },
 ];
 
 async function loadModel() {
@@ -117,7 +117,7 @@ async function stopSource() {
   video.pause(); video.removeAttribute('src'); video.srcObject = null; video.controls = false;
   mode = null; lastMsg = ''; guideSt.noFace = 0; guideSt.cuts = []; guideSt.okUntil = 0; setGuide('', '');
   octx.clearRect(0, 0, overlay.width, overlay.height);
-  spotter.reset();
+  spotter.reset(); spellSpotter.reset();
   updateUI();
 }
 
@@ -166,6 +166,7 @@ function tick() {
   const raw = toFrame(res);
   drawLive(raw);
   guideStep(ts, raw);
+  faceStep(ts);
   handleFrame(ts, S.lefty ? mirrorFrame(raw) : raw);
 }
 
@@ -284,11 +285,19 @@ function guideStep(ts, raw) {
 // ---------- Segmentación y consumidores ----------
 // Lectura continua: reconoce las señas aunque vayan seguidas o haya una mano apoyada en el cuadro
 const spotter = new Spotter();
-function syncSpotter() { spotter.setLibrary(lib, threshold()); }
+const spellSpotter = new Spotter();
+const isLetter = w => /^[a-zñ]$/.test(w);
+function syncSpotter() { spotter.setLibrary(lib, threshold()); spellSpotter.setLibrary(lib.filter(s => isLetter(s.word)), threshold()); }
 
 function handleFrame(ts, frame) {
   const has = anyPresent(frame);
   if (!(tab === 'translate' || (tab === 'converse' && cvCam))) return;
+  if (spellOn && tab === 'translate') {
+    const sev = spellSpotter.push(ts, frame);
+    setStageMsg(has ? 'Leyendo la letra…' : 'Deletreando: una letra por vez, bajando las manos');
+    for (const e of sev) onSpellEvent(e);
+    return;
+  }
   const evs = spotter.push(ts, frame);
   setStageMsg(has ? 'Mirando…' : 'Listo: pedile una seña');
   for (const e of evs) (tab === 'translate' ? onTranslateEvent : onConverseEvent)(e);
@@ -302,7 +311,7 @@ function onTranslateEvent(e) {
   if (e.kind === 'short') { setStageMsg('Muy corta o muy rápida: pedile que la haga más lento', 3500); cue('warn'); return; }
   if (!lib.length) { last = { ranks: [], accepted: false, note: 'Todavía no hay vocabulario cargado en esta versión de la app.' }; renderLast(); return; }
   const j = judgeRanks(e.ranks);
-  transcript.push({ word: j.accepted ? j.ranks[0].word : null, doubt: j.doubt && j.accepted, cands: j.ranks.slice(0, 3).map(r => r.word) });
+  transcript.push({ word: j.accepted ? j.ranks[0].word : null, doubt: j.doubt && j.accepted, q: j.accepted && e.kind === 'sign' && browFlag(e.t0, e.t1), cands: j.ranks.slice(0, 3).map(r => r.word) });
   last = { ...j, q16: e.q16, idx: transcript.length - 1 };
   renderTranscript(); renderLast();
   if (j.doubt) { setStageMsg('No estoy seguro/a: mirá abajo y comparalo con la persona', 3500); cue('doubt'); }
@@ -320,7 +329,7 @@ function renderTranscript() {
   const el = $('#transcript');
   renderPhrase();
   if (!transcript.length) { el.innerHTML = '<span class="mut">Poné las manos en cuadro, hacé la seña y bajalas.</span>'; return; }
-  el.innerHTML = transcript.map((t, i) => `<span class="chip ${t.phrase ? 'phrase' : t.word && !t.doubt ? '' : 'unk'} ${i === transcript.length - 1 ? 'last' : ''}">${t.phrase ? esc(t.phrase) : t.word ? (t.doubt ? '¿' + esc(t.word) + '?' : esc(t.word)) : '¿?'}</span>`).join('');
+  el.innerHTML = transcript.map((t, i) => `<span class="chip ${t.phrase ? 'phrase' : t.word && !t.doubt ? '' : 'unk'} ${i === transcript.length - 1 ? 'last' : ''}">${t.phrase ? esc(t.phrase) : t.word ? (t.doubt ? '¿' + esc(t.word) + '?' : esc(t.word)) : '¿?'}${t.q ? '<b class="qb" title="La cara marcó pregunta (ceño fruncido)">?</b>' : ''}</span>`).join('');
 }
 
 // Prototipo de frases: si las últimas señas encajan con una frase de la lista del equipo, se propone completarla
@@ -500,7 +509,7 @@ document.querySelectorAll('button[data-accent]').forEach(b => b.onclick = () => 
 
 // ---------- Ajustes ----------
 function loadSettingsUI() {
-  applyLook(); $('#setGuide').checked = S.guide; $('#setHelp').checked = S.help; $('#setCue').checked = S.cue; corrUI();
+  applyLook(); $('#setFace').checked = S.face; $('#setGuide').checked = S.guide; $('#setHelp').checked = S.help; $('#setCue').checked = S.cue; corrUI();
   $('#setFacing').value = S.facing; $('#setAuto').checked = S.auto; $('#setThr').value = S.thr; $('#setLefty').checked = S.lefty; $('#setSpeak').checked = S.speak;
   updateThrLabel();
 }
@@ -508,6 +517,7 @@ function updateThrLabel() { $('#thrVal').textContent = S.auto ? 'automática' : 
 $('#setFacing').onchange = e => { S.facing = e.target.value; saveS(); if (mode === 'camera') startCamera(); else updateUI(); };
 $('#setAuto').onchange = e => { S.auto = e.target.checked; saveS(); updateThrLabel(); renderLibInfo(); syncSpotter(); };
 $('#setThr').oninput = e => { S.thr = +e.target.value; saveS(); updateThrLabel(); syncSpotter(); };
+$('#setFace').onchange = e => { S.face = e.target.checked; saveS(); if (S.face) ensureFlm(); };
 $('#setGuide').onchange = e => { S.guide = e.target.checked; saveS(); if (S.guide) ensureFaceDet(); else setGuide('', ''); };
 $('#setHelp').onchange = e => { S.help = e.target.checked; saveS(); corrUI(); };
 $('#setCue').onchange = e => { S.cue = e.target.checked; saveS(); };
@@ -619,7 +629,7 @@ function subtitleLines() {
     const sl = signLines[signLines.length - 1];
     return [sl ? sl.words.map(w => w || '¿?').join(' ') : '', v].filter(Boolean);
   }
-  return [transcript.slice(-8).map(t => t.phrase || (t.word ? (t.doubt ? '¿' + t.word + '?' : t.word) : '¿?')).join(' ')].filter(Boolean);
+  return [transcript.slice(-8).map(t => t.phrase || (t.word ? (t.doubt ? '¿' + t.word + '?' : t.word + (t.q ? ' ?' : '')) : '¿?')).join(' ')].filter(Boolean);
 }
 
 function wrapText(ctx, text, maxW) {
@@ -691,6 +701,65 @@ async function finishRecording(r) {
 }
 $('#btnRec').onclick = () => (rec ? stopRecording() : startRecording());
 
+// ---------- Modo deletreo (nombres propios): las letras quietas se juntan en una palabra ----------
+let spellOn = false; const spell = [];
+const spellText = () => spell.map(l => l.ch).join('');
+function renderSpell() {
+  const w = $('#spellWord');
+  w.innerHTML = spell.length ? spell.map(l => l.ch === ' ' ? '<span class="sp"></span>' : `<span class="ltr ${l.doubt ? 'unk' : ''}">${esc(l.ch.toUpperCase())}</span>`).join('') : '<span class="mut">Hacé la primera letra…</span>';
+  const alt = $('#spellAlt'); alt.innerHTML = '';
+  const last = spell[spell.length - 1];
+  if (last && last.cands && last.cands.length > 1) {
+    const l = document.createElement('span'); l.className = 'mut'; l.textContent = 'Última letra:'; alt.appendChild(l);
+    last.cands.forEach(c => { const b = document.createElement('button'); b.textContent = c.toUpperCase(); if (c === last.ch) b.className = 'pri'; b.onclick = () => { last.ch = c; last.doubt = false; renderSpell(); }; alt.appendChild(b); });
+  }
+  $('#btnSpell').setAttribute('aria-pressed', String(spellOn));
+  $('#btnSpell').textContent = spellOn ? 'Dejar de deletrear' : 'Deletrear un nombre';
+  $('#spellBox').hidden = !spellOn;
+}
+function onSpellEvent(e) {
+  if (e.kind === 'sign') {
+    const margin = e.ranks[1] ? e.ranks[1].dist - e.ranks[0].dist : 1;
+    spell.push({ ch: e.word, cands: e.ranks.filter(r => isLetter(r.word)).slice(0, 3).map(r => r.word), doubt: margin < 0.03 });
+    cue(margin < 0.03 ? 'doubt' : 'ok'); renderSpell();
+  } else { setStageMsg('No pude leer la letra: probá de nuevo, más lento', 3000); cue('warn'); }
+}
+$('#btnSpell').onclick = () => { spellOn = !spellOn; spotter.reset(); spellSpotter.reset(); renderSpell(); };
+$('#spellSpace').onclick = () => { if (spell.length && spell[spell.length - 1].ch !== ' ') { spell.push({ ch: ' ', cands: [] }); renderSpell(); } };
+$('#spellBack').onclick = () => { spell.pop(); renderSpell(); };
+$('#spellDone').onclick = () => {
+  const t = spellText().trim().split(/\s+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  if (t) { transcript.push({ word: t, cands: [t], spelled: true }); renderTranscript(); }
+  spell.length = 0; renderSpell();
+};
+
+// ---------- Cejas y boca (experimental): el ceño fruncido durante una seña la marca como pregunta ----------
+let flm = null, flmTry = false, flmTs = 0, flmN = 0; const browHist = [];
+async function ensureFlm() {
+  if (flm || flmTry || !mpKit || !mpKit.mp.FaceLandmarker) return;
+  flmTry = true;
+  try { flm = await mpKit.mp.FaceLandmarker.createFromOptions(mpKit.fs, { baseOptions: { modelAssetPath: mpKit.src.flm, delegate: 'CPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true }); } catch (e) { console.warn('modelo de cara:', e.message); }
+}
+function faceStep(ts) {
+  if (!S.face || !(tab === 'translate' || (tab === 'converse' && cvCam))) return;
+  if (++flmN % 4) return;
+  ensureFlm(); if (!flm || !video.videoWidth) return;
+  try {
+    flmTs = Math.max(flmTs + 1, ts);
+    const r = flm.detectForVideo(video, flmTs), cats = r.faceBlendshapes && r.faceBlendshapes[0] && r.faceBlendshapes[0].categories; if (!cats) return;
+    const g = n => (cats.find(c => c.categoryName === n) || { score: 0 }).score;
+    browHist.push({ t: ts, v: (g('browDownLeft') + g('browDownRight')) / 2 });
+    while (browHist.length && browHist[0].t < ts - 20000) browHist.shift();
+  } catch (e) { /* sin cara */ }
+}
+// ¿subió el ceño fruncido, respecto de lo habitual de esa persona, mientras hacía la seña? (umbral medido con las preguntas de los videos)
+function browFlag(t0, t1) {
+  if (!S.face || browHist.length < 8) return false;
+  const vs = browHist.map(x => x.v).sort((a, b) => a - b), base = vs[vs.length >> 1];
+  const win = browHist.filter(x => x.t >= t0 - 300 && x.t <= t1 + 300);
+  return win.length > 0 && Math.max(...win.map(x => x.v)) - base > 0.27;
+}
+
 // ---------- Instalar y compartir ----------
 let installEvt = null;
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || /[?&]source=(apk|pwa)/.test(location.search);
@@ -729,7 +798,8 @@ function updateUI() {
   if (!mode && rec) stopRecording();
 }
 function showTab(name) {
-  tab = name; spotter.reset();
+  tab = name; spotter.reset(); spellSpotter.reset();
+  if (name !== 'translate' && spellOn) { spellOn = false; renderSpell(); }
   if (name !== 'converse') converseStop();
   (name === 'converse' ? $('#cvStageSlot') : $('main')).insertBefore(stage, name === 'converse' ? null : $('#tab-translate'));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
@@ -742,7 +812,7 @@ $('#btnCam').onclick = () => (mode === 'camera' ? stopSource() : startCamera());
 
 // ---------- Inicio ----------
 (async function init() {
-  loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); installUI(); renderTranscript(); updateUI();
+  loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); installUI(); renderSpell(); renderTranscript(); updateUI();
   await loadLibrary();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   window.__lsa = { get lib() { return lib; }, get phrases() { return phrases; }, transcript, renderTranscript, get meta() { return libMeta; }, S, rank, prepare, resample };

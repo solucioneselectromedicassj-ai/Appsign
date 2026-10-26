@@ -35,3 +35,7 @@ Más adelante, con un servidor, el envío puede ser automático.
 - La lectura continua (Spotter) acierta más que cortar cuando bajan las manos (76 contra 68 de 103 señas, con 19 contra 31 equivocadas), medido con los mismos videos.
 - Ayuda de encuadre: la cara ocupa entre 0,16 y 0,34 del ancho y queda en el tercio de arriba en los videos que mejor funcionaron.
 - Pendiente: modo deletreo (solo nombres propios), guía de grabación para la asociación (30 a 50 palabras, 3 repeticiones, medio cuerpo, fondo liso), rasgos no manuales (cejas, boca, cabeza) medidos con las preguntas de los videos.
+
+## Modo deletreo y cejas/boca (octubre 2026)
+- Modo deletreo (Traducir → «Deletrear un nombre»): las letras quietas se juntan en una palabra; es el último recurso, la idea es tener muchas palabras completas.
+- Cejas y boca (Ajustes, experimental, apagado): el ceño fruncido durante una seña la marca como pregunta. En los videos: 5 de 6 preguntas con palabra interrogativa lo cumplen y 5 de 58 señas que no lo son también (una sola persona señando las preguntas). Falta confirmarlo con más personas.

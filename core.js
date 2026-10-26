@@ -228,7 +228,7 @@ export class Spotter {
     }
     return best;
   }
-  _sign(c) { this.lastEmit = { t0: c.t0, t1: c.t1 }; this.emitted = true; return { kind: 'sign', word: c.word, dist: c.dist, ranks: c.ranks, q16: c.q16, dur: (c.t1 - c.t0) * 1000 }; }
+  _sign(c) { this.lastEmit = { t0: c.t0, t1: c.t1, word: c.word }; this.emitted = true; return { kind: 'sign', word: c.word, dist: c.dist, ranks: c.ranks, q16: c.q16, dur: (c.t1 - c.t0) * 1000, t0: c.t0 * 1000, t1: c.t1 * 1000 }; }
   // t en milisegundos; devuelve una lista de eventos (casi siempre vacía)
   push(tMs, frame) {
     const t = tMs / 1000, has = anyPresent(frame), ev = [];
@@ -241,7 +241,8 @@ export class Spotter {
       const c = this._eval(t);
       if (c) {
         if (!this.bestUnknown || c.dist < this.bestUnknown.dist) this.bestUnknown = c;
-        const dup = this.lastEmit && this._ov(c, this.lastEmit) > 0.4 * Math.min(c.t1 - c.t0, this.lastEmit.t1 - this.lastEmit.t0);
+        // misma seña que sigue (una pose sostenida) o ventana que se pisa con la anterior: no se repite hasta que las manos bajen
+        const dup = this.lastEmit && (this._ov(c, this.lastEmit) > 0.4 * Math.min(c.t1 - c.t0, this.lastEmit.t1 - this.lastEmit.t0) || (c.word === this.lastEmit.word && c.t0 < this.lastEmit.t1 + 0.5));
         if (c.dist <= this.thr && !dup) {
           if (!this.pending) this.pending = { c, at: t };
           else if (this._ov(c, this.pending.c) > 0) { if (c.dist < this.pending.c.dist) this.pending = { c, at: t }; }
