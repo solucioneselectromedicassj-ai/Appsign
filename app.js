@@ -11,10 +11,11 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Ajustes ----------
-const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'blue', help: false, cue: true, guide: true, face: false };
+const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'marea', help: false, cue: true, guide: true, face: false };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
 if (!S.v) { S.cvFlip = false; S.v = 2; }
+if (S.v < 3) { if (S.accent === 'blue') S.accent = 'marea'; S.v = 3; }
 const saveS = () => { try { localStorage.setItem('lsa-settings', JSON.stringify(S)); } catch (e) { /* ignorar */ } };
 
 // ---------- Biblioteca (solo lo que viene en library.json, publicado por el equipo) ----------
@@ -495,7 +496,7 @@ function applyLook() {
   const h = document.documentElement;
   h.style.setProperty('--fs', S.fs);
   if (S.theme === 'auto') delete h.dataset.theme; else h.dataset.theme = S.theme;
-  if (S.accent === 'blue') delete h.dataset.accent; else h.dataset.accent = S.accent;
+  if (S.accent === 'marea') delete h.dataset.accent; else h.dataset.accent = S.accent;
   document.querySelectorAll('[data-fs]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.fs === +S.fs)));
   document.querySelectorAll('button[data-theme]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === S.theme)));
   document.querySelectorAll('button[data-accent]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.accent === S.accent)));

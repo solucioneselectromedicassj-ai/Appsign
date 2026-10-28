@@ -2,7 +2,7 @@
 // Cachea el código propio y el motor/modelos de la carpeta mp/ a medida que se piden.
 importScripts('version.js'); // define APP_VERSION
 const CACHE = 'appsign-' + self.APP_VERSION;
-const SHELL = ['./', 'index.html', 'version.js', 'theme.js', 'instalar.js', 'app.js', 'core.js', 'config.js', 'library.json', 'manifest.webmanifest', 'icon.svg', 'privacy.html', 'instalar.html', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-180.png'];
+const SHELL = ['./', 'index.html', 'version.js', 'theme.js', 'fonts/atkinson-hyperlegible-latin-400-normal.woff2', 'fonts/atkinson-hyperlegible-latin-700-normal.woff2', 'fonts/outfit-latin-wght-normal.woff2', 'instalar.js', 'app.js', 'core.js', 'config.js', 'library.json', 'manifest.webmanifest', 'icon.svg', 'privacy.html', 'instalar.html', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

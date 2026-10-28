@@ -39,3 +39,6 @@ Más adelante, con un servidor, el envío puede ser automático.
 ## Modo deletreo y cejas/boca (octubre 2026)
 - Modo deletreo (Traducir → «Deletrear un nombre»): las letras quietas se juntan en una palabra; es el último recurso, la idea es tener muchas palabras completas.
 - Cejas y boca (Ajustes, experimental, apagado): el ceño fruncido durante una seña la marca como pregunta. En los videos: 5 de 6 preguntas con palabra interrogativa lo cumplen y 5 de 58 señas que no lo son también (una sola persona señando las preguntas). Falta confirmarlo con más personas.
+
+## Estética «Marea» (octubre 2026)
+Paleta propia (verde agua profundo, menta y crema), tipografías Atkinson Hyperlegible (cuerpo, pensada para baja visión) y Outfit (títulos), olas suaves de fondo, botones de píldora y pantalla de entrada con el logo animado (se ve una vez por sesión; respeta «reducir movimiento»). El azul anterior sigue disponible en Ajustes → Color de la app. Fuentes con licencia OFL en `fonts/`.
