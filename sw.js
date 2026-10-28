@@ -1,7 +1,8 @@
 // Service worker: la app funciona sin conexión después de la primera carga.
 // Cachea el código propio y el motor/modelos de la carpeta mp/ a medida que se piden.
-const CACHE = 'appsign-v24';
-const SHELL = ['./', 'index.html', 'theme.js', 'instalar.js', 'app.js', 'core.js', 'config.js', 'library.json', 'manifest.webmanifest', 'icon.svg', 'privacy.html', 'instalar.html', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-180.png'];
+importScripts('version.js'); // define APP_VERSION
+const CACHE = 'appsign-' + self.APP_VERSION;
+const SHELL = ['./', 'index.html', 'version.js', 'theme.js', 'instalar.js', 'app.js', 'core.js', 'config.js', 'library.json', 'manifest.webmanifest', 'icon.svg', 'privacy.html', 'instalar.html', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

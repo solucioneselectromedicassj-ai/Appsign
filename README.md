@@ -28,3 +28,6 @@ Vercel: importar el repo, Framework "Other", sin build command. Requiere https (
 Local: `python3 -m http.server 8000` → http://localhost:8000
 
 Estado: prototipo. Falta calibrar con manos reales y validar con la comunidad sorda.
+
+## Número de versión
+Se cambia solo en `version.js` (`APP_VERSION`). Aparece en Ajustes (junto con la versión del vocabulario) y renueva la caché del service worker. Convención: subir el 2.º número cuando hay una función nueva (0.5.0 → 0.6.0) y el 3.º para arreglos (0.5.0 → 0.5.1). El vocabulario tiene su propia versión en `library.json`.

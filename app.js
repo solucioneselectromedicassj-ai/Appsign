@@ -63,6 +63,7 @@ function renderLibInfo() {
   $('#testBanner').style.display = lib.length && !libMeta.validated ? '' : 'none';
   const t = lib.length ? `Vocabulario ${/^\d/.test(libMeta.version) ? 'v' : ''}${libMeta.version}: ${libMeta.words} palabras (${lib.length} muestras) · umbral ${threshold().toFixed(3)}${S.auto ? (libMeta.threshold ? ' (fijado por el equipo)' : ' (auto)') : ''}` : 'Todavía no hay vocabulario cargado en esta versión.';
   $('#libInfo').textContent = t; $('#libInfo2').textContent = t;
+  $('#verInfo').textContent = `Appsign ${globalThis.APP_VERSION || '?'} · vocabulario ${libMeta.version || '—'}${libMeta.validated ? '' : ' (de prueba)'}`;
   const words = [...new Set(lib.map(s => s.word))].sort((a, b) => a.localeCompare(b, 'es'));
   $('#vocabList').textContent = words.join(' · ') || '—';
   $('#wordList').innerHTML = words.map(w => `<option value="${esc(w)}">`).join('');
@@ -811,5 +812,5 @@ $('#btnCam').onclick = () => (mode === 'camera' ? stopSource() : startCamera());
   loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); installUI(); renderSpell(); renderTranscript(); updateUI();
   await loadLibrary();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-  window.__lsa = { get lib() { return lib; }, get phrases() { return phrases; }, transcript, renderTranscript, get meta() { return libMeta; }, S, rank, prepare, resample };
+  window.__lsa = { version: globalThis.APP_VERSION, get lib() { return lib; }, get phrases() { return phrases; }, transcript, renderTranscript, get meta() { return libMeta; }, S, rank, prepare, resample };
 })();
