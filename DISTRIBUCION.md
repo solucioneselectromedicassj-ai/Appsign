@@ -3,7 +3,7 @@
 ## Hoy (sin tiendas)
 | Dónde | Cómo | Costo |
 |---|---|---|
-| **Cualquier celular o compu** | Abrir https://appsign-qj7v.vercel.app (o escanear el QR de `instalar.html`) | Gratis |
+| **Cualquier celular o compu** | Abrir https://appsign.vercel.app (o escanear el QR de `instalar.html`). El link anterior appsign-qj7v.vercel.app sigue funcionando | Gratis |
 | **Android** | Chrome → ⋮ → «Instalar app», o bajar el **APK de prueba** (Releases → `apk-prueba`) | Gratis |
 | **iPhone** | Safari → Compartir → «Agregar a inicio» | Gratis |
 
