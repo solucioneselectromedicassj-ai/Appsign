@@ -134,21 +134,21 @@ a{color:var(--acc)}
 .camrow button{display:inline-flex;align-items:center;gap:8px;justify-content:center}
 .camrow svg{width:20px;height:20px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-#splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;pointer-events:none;background:radial-gradient(800px 600px at 50% 40%,#0b2b31,#06191d);animation:spOut .55s ease 2.2s forwards}
+#splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;pointer-events:none;background:radial-gradient(800px 600px at 50% 40%,#0b2b31,#06191d);animation:spOut .7s ease 4.3s forwards}
 .nosplash #splash{display:none}
 .sp-box{text-align:center}
-.sp-tile{transform-box:fill-box;transform-origin:center;animation:spPop .55s cubic-bezier(.2,1.3,.4,1) both}
+.sp-tile{transform-box:fill-box;transform-origin:center;animation:spPop .8s cubic-bezier(.2,1.3,.4,1) both}
 .sp-w1,.sp-w2{stroke-dasharray:1;stroke-dashoffset:1}
-.sp-w1{animation:spDraw .75s ease .35s forwards}
-.sp-w2{animation:spDraw .75s ease .65s forwards}
-.sp-dot{transform-box:fill-box;transform-origin:center;transform:scale(0);animation:spPop .45s cubic-bezier(.2,1.6,.4,1) 1.25s forwards}
-.sp-word{margin-top:22px;font-size:2.6rem;font-weight:600;color:#e8f5f2;opacity:0;transform:translateY(10px);animation:spUp .6s ease 1.2s forwards}
-.sp-sub{margin-top:6px;font-size:1rem;color:#93b8b4;letter-spacing:.4px;opacity:0;animation:spUp .6s ease 1.5s forwards}
+.sp-w1{animation:spDraw 1.1s ease .7s forwards}
+.sp-w2{animation:spDraw 1.1s ease 1.2s forwards}
+.sp-dot{transform-box:fill-box;transform-origin:center;transform:scale(0);animation:spPop .6s cubic-bezier(.2,1.6,.4,1) 2.2s forwards}
+.sp-word{margin-top:22px;font-size:2.6rem;font-weight:600;color:#e8f5f2;opacity:0;transform:translateY(10px);animation:spUp .9s ease 2.1s forwards}
+.sp-sub{margin-top:6px;font-size:1rem;color:#93b8b4;letter-spacing:.4px;opacity:0;animation:spUp .9s ease 2.8s forwards}
 @keyframes spDraw{to{stroke-dashoffset:0}}
 @keyframes spPop{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes spUp{to{opacity:1;transform:none}}
 @keyframes spOut{to{opacity:0;visibility:hidden}}
-@media (prefers-reduced-motion:reduce){#splash{animation:spOut .3s ease .9s forwards}.sp-tile,.sp-w1,.sp-w2,.sp-dot,.sp-word,.sp-sub{animation:none!important;stroke-dashoffset:0;transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){#splash{animation:spOut .4s ease 2.2s forwards}.sp-tile,.sp-w1,.sp-w2,.sp-dot,.sp-word,.sp-sub{animation:none!important;stroke-dashoffset:0;transform:none;opacity:1}}
 </style>
 </head>
 <body>
