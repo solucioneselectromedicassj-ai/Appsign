@@ -1,0 +1,1 @@
+try{var _s=JSON.parse(localStorage.getItem('lsa-settings')||'{}'),_h=document.documentElement;if(_s.fs)_h.style.setProperty('--fs',_s.fs);if(_s.theme&&_s.theme!=='auto')_h.dataset.theme=_s.theme;if(_s.accent&&_s.accent!=='blue')_h.dataset.accent=_s.accent}catch(e){}

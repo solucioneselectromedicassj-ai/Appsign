@@ -41,8 +41,4 @@ img.logo{width:64px;height:64px;border-radius:14px;display:block}
 <div class="card"><h2>Computadora</h2><p class="mut" style="margin:0">Abrí el link en Chrome o Edge y buscá el ícono de instalar en la barra de direcciones.</p></div>
 <p class="mut">Prototipo: las señas todavía no fueron validadas por la comunidad sorda. No se guarda ni se envía video. <a href="privacy.html" style="color:inherit">Privacidad</a></p>
 </main>
-<script>
-var u=location.origin+'/',t='Appsign: traductor de lengua de señas argentina (prototipo)';
-document.getElementById('wa').href='https://wa.me/?text='+encodeURIComponent(t+' '+u);
-document.getElementById('share').onclick=function(){if(navigator.share){navigator.share({title:'Appsign',text:t,url:u}).catch(function(){})}else if(navigator.clipboard){navigator.clipboard.writeText(u).then(function(){alert('Link copiado')})}else{prompt('Copiá el link:',u)}};
-</script></body></html>
+<script src="instalar.js"></script></body></html>

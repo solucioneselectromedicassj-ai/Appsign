@@ -2,10 +2,7 @@ import { T, FRAME_LEN, HAND_LEN, Segmenter, resample, prepare, rank, mirrorFrame
 import { CONFIG } from './config.js';
 
 // ---------- Configuración ----------
-const MP_VER = '0.10.14';
-const MP_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}/vision_bundle.mjs`;
-const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}/wasm`;
-const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+// El motor de reconocimiento (MediaPipe 0.10.14) y los modelos viven en la carpeta mp/ de este mismo sitio: la app no carga código de terceros.
 
 const HAND_CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 const COLORS = ['#38bdf8', '#fb923c'];
@@ -80,10 +77,9 @@ function setStatus(t, cls = '') { const p = $('#status'); p.textContent = t; p.c
 // ---------- Modelo y cámara ----------
 let landmarker = null, mode = null, stream = null, running = false, mpKit = null;
 
-// Primero los archivos propios (carpeta mp/, funcionan sin internet); si faltan, el CDN.
+// Solo archivos propios (carpeta mp/): funcionan sin internet y no se ejecuta código de otros sitios.
 const MP_SOURCES = [
   { label: 'archivos propios', mod: './mp/vision_bundle.mjs', wasm: 'mp/wasm', model: 'mp/hand_landmarker.task', face: 'mp/blaze_face_short_range.tflite', flm: 'mp/face_landmarker.task' },
-  { label: 'CDN', mod: MP_URL, wasm: WASM_URL, model: MODEL_URL, face: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite', flm: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task' },
 ];
 
 async function loadModel() {
