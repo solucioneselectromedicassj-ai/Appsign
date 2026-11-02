@@ -335,6 +335,19 @@ a{color:var(--acc)}
       <p class="mut" id="libInfo2"></p>
       <details><summary>Ver palabras incluidas</summary><div id="vocabList" class="mut" style="margin-top:6px"></div></details>
     </div>
+    <div class="card" id="fbCard">
+      <h3>Sugerencias y errores</h3>
+      <p class="mut">¿Algo no anda, falta una palabra o tenés una idea? Contanos. Lo lee el equipo de Appsign.</p>
+      <label for="fbType">¿Qué querés mandar?</label>
+      <select id="fbType"><option value="error">Un error o algo que no anda</option><option value="sugerencia">Una sugerencia o idea</option><option value="otro">Otra cosa</option></select>
+      <label for="fbMsg">Tu mensaje</label>
+      <textarea id="fbMsg" rows="4" maxlength="2000" placeholder="Contanos qué pasó o qué te gustaría" style="width:100%;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:14px;padding:12px;font:inherit"></textarea>
+      <label for="fbContact">Tu correo o teléfono, si querés que te respondamos (opcional)</label>
+      <input type="text" id="fbContact" maxlength="120" autocomplete="off">
+      <label class="chk"><input type="checkbox" id="fbTech" checked> <span>Incluir datos técnicos (versión de la app y tipo de celular) para entender mejor el problema</span></label>
+      <div class="row"><button id="fbSend" class="ok big-btn" disabled>Enviar</button></div>
+      <div id="fbMsgOut" class="mut" role="status" aria-live="polite"></div>
+    </div>
     <div class="card">
       <h3>Apariencia</h3>
       <label id="lblFs">Tamaño de las letras de la app</label>

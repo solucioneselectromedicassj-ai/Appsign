@@ -826,6 +826,30 @@ $('#valWrong').onclick = () => { $('#valVarBox').hidden = false; $('#valVar').pl
 $('#valVarSend').onclick = () => castVote($('#valVarSend').dataset.kind || 'distinta');
 $('#valSkip').onclick = () => castVote('skip');
 
+// ---------- Sugerencias y errores ----------
+const fbCheck = () => { $('#fbSend').disabled = $('#fbMsg').value.trim().length < 5; };
+$('#fbMsg').addEventListener('input', fbCheck);
+function fbTechInfo() { return `Appsign ${globalThis.APP_VERSION || '?'} · vocabulario ${libMeta.version || '—'} · ${(navigator.userAgent || '').replace(/\s+/g, ' ').slice(0, 150)} · ${innerWidth}x${innerHeight} · pantalla ${tab}`; }
+$('#fbSend').onclick = async () => {
+  const msg = $('#fbMsgOut'), tipo = $('#fbType').value, mensaje = $('#fbMsg').value.trim().slice(0, 2000), contacto = $('#fbContact').value.trim().slice(0, 120) || null, tech = $('#fbTech').checked ? fbTechInfo() : null;
+  if (mensaje.length < 5) return;
+  msg.textContent = '';
+  if (VOTE_OK) {
+    try {
+      const body = { tipo, mensaje, contacto, pantalla: tab, version: String(globalThis.APP_VERSION || '').slice(0, 40), tecnico: tech && tech.slice(0, 300), lengua: CONFIG.lengua || 'LSA', pais: CONFIG.pais || 'AR', dispositivo: voter.id };
+      const r = await fetch(CONFIG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/sugerencias', { method: 'POST', headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      $('#fbMsg').value = ''; fbCheck(); msg.textContent = '¡Gracias! Recibimos tu mensaje.'; return;
+    } catch (e) { msg.textContent = 'No se pudo enviar (' + (e.message || e.name) + '). Lo intentamos por otro medio.'; }
+  }
+  // Sin servidor (o si falló): se manda por el menú del celular, el correo o WhatsApp del equipo
+  const text = `Appsign · ${tipo === 'error' ? 'Error' : tipo === 'sugerencia' ? 'Sugerencia' : 'Mensaje'}\n\n${mensaje}${contacto ? '\n\nContacto: ' + contacto : ''}${tech ? '\n\n(' + tech + ')' : ''}`;
+  if (navigator.share) { try { await navigator.share({ title: 'Appsign: ' + tipo, text }); msg.textContent = 'Listo: elegí a quién mandarlo.'; return; } catch (e) { if (e && e.name === 'AbortError') { msg.textContent = 'Envío cancelado.'; return; } } }
+  if (CONFIG.email) { location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent('Appsign: ' + tipo)}&body=${encodeURIComponent(text)}`; return; }
+  if (CONFIG.whatsapp) { window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text)}`, '_blank'); return; }
+  try { await navigator.clipboard.writeText(text); msg.textContent = 'Copiamos tu mensaje: pegalo donde quieras mandarlo al equipo.'; } catch (e) { msg.textContent = 'No pudimos enviarlo desde acá. Escribinos desde la sección Colaborar.'; }
+};
+
 // ---------- Instalar y compartir ----------
 let installEvt = null;
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || /[?&]source=(apk|pwa)/.test(location.search);
