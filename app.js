@@ -813,7 +813,7 @@ async function castVote(kind) {
   if (!curCand) return;
   const msg = $('#valMsg'); msg.textContent = '';
   if (kind === 'skip') { voter.skipped.push(curCand.id); saveVoter(); renderValidar(); return; }
-  const body = { candidata: curCand.id, palabra: curCand.word, voto: kind, variante: ((kind === 'distinta' || kind === 'otra') && $('#valVar').value.trim().slice(0, 120)) || null, rol: voter.role, region: voter.region || null, dispositivo: voter.id };
+  const body = { candidata: curCand.id, palabra: curCand.word, voto: kind, variante: ((kind === 'distinta' || kind === 'otra') && $('#valVar').value.trim().slice(0, 120)) || null, rol_declarado: voter.role, region: voter.region || null, dispositivo: voter.id, lengua: CONFIG.lengua || 'LSA', pais: CONFIG.pais || 'AR' };
   try {
     const r = await fetch(CONFIG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/votos', { method: 'POST', headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) });
     if (!r.ok && r.status !== 409) throw new Error('HTTP ' + r.status);
