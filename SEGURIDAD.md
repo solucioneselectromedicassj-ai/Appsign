@@ -16,3 +16,10 @@
 - Llave del APK de prueba: pública a propósito, no sirve para la tienda. La llave de la tienda se guarda fuera de GitHub (GitHub Secrets) con copia aparte.
 - Activar verificación en dos pasos en GitHub, Vercel y Google Play.
 - Si algún día se suma servidor (envíos automáticos): autenticación, límite de pedidos y revisión de lo que se sube.
+
+## Protección del código y de la marca (resumen)
+- `LICENSE`: todos los derechos reservados. Que el repositorio sea visible no da permiso de uso.
+- `terminos.html`: prohíbe copiar o reutilizar el código, el vocabulario y el diseño.
+- `THIRD_PARTY_NOTICES.md` y `licenses/`: avisos de MediaPipe (Apache-2.0) y tipografías (OFL).
+- Pendiente de decidir: repositorio privado; registro de la marca «Appsign» (INPI) y del software (Dirección Nacional del Derecho de Autor); acuerdo con la fundación sobre quién es titular del vocabulario.
+- Ningún secreto vive en el repositorio: la llave de firma de la tienda va en GitHub Secrets.
