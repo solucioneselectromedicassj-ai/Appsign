@@ -1,4 +1,4 @@
-// © 2026 Appsign. Todos los derechos reservados. Ver LICENSE.
+// © 2026 Soluciones Electromédicas SJ (Appsign). Todos los derechos reservados. Ver LICENSE.
 // core.js — lógica pura (sin DOM): segmentación, remuestreo, features, DTW y ranking.
 // Un "frame" crudo = Float32Array/Array de 126 números: 2 manos (slot 0 y 1) x 21 puntos x (x,y,z).
 // Mano ausente = 63 ceros.

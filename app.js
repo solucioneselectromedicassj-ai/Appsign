@@ -1,4 +1,4 @@
-// © 2026 Appsign. Todos los derechos reservados. Ver LICENSE.
+// © 2026 Soluciones Electromédicas SJ (Appsign). Todos los derechos reservados. Ver LICENSE.
 import { T, FRAME_LEN, HAND_LEN, Segmenter, resample, prepare, rank, mirrorFrame, anyPresent, presentSlot, normWord, autoThreshold, suggestPhrase, Spotter } from './core.js';
 import { CONFIG } from './config.js';
 

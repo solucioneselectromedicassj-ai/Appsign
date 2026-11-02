@@ -21,5 +21,6 @@
 - `LICENSE`: todos los derechos reservados. Que el repositorio sea visible no da permiso de uso.
 - `terminos.html`: prohíbe copiar o reutilizar el código, el vocabulario y el diseño.
 - `THIRD_PARTY_NOTICES.md` y `licenses/`: avisos de MediaPipe (Apache-2.0) y tipografías (OFL).
-- Pendiente de decidir: repositorio privado; registro de la marca «Appsign» (INPI) y del software (Dirección Nacional del Derecho de Autor); acuerdo con la fundación sobre quién es titular del vocabulario.
+- Titular y responsable: Soluciones Electromédicas SJ. Falta confirmar razón social, CUIT y correo de contacto para la tienda.
+- Decidido: el repositorio `Appsign` sigue público (código visible, sin permiso de uso). Pendiente de decidir: registro de la marca «Appsign» (INPI) y del software (Dirección Nacional del Derecho de Autor); acuerdo con la fundación sobre quién es titular del vocabulario.
 - Ningún secreto vive en el repositorio: la llave de firma de la tienda va en GitHub Secrets.
