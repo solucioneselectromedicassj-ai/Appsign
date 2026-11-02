@@ -259,6 +259,29 @@ a{color:var(--acc)}
 
   <!-- COLABORAR -->
   <section id="tab-collab">
+    <div class="card" id="acctCard" hidden>
+      <h3>Tu cuenta</h3>
+      <p id="acctMsg" class="mut" role="status" aria-live="polite"></p>
+      <div id="acctOut">
+        <p class="mut">Ingresá con tu cuenta de Google para <b>mandar tus videos</b> y para que tus <b>votos cuenten con tu rol</b>. No vemos tu contraseña: usamos tu correo solo para identificarte.</p>
+        <button id="acctGoogle" class="pri wide">Ingresar con Google</button>
+      </div>
+      <div id="acctForm" hidden>
+        <p class="mut">Cuenta: <b id="acctWho"></b>. Contanos un poco para terminar:</p>
+        <label for="acctRol">¿Cómo te presentás?</label>
+        <select id="acctRol"><option value="">Elegí…</option><option value="sorda">Soy una persona sorda</option><option value="interprete">Soy intérprete</option><option value="docente">Soy docente de LSA</option><option value="aprendiz">Estoy aprendiendo</option></select>
+        <label for="acctPais">País</label>
+        <select id="acctPais"><option value="AR">Argentina</option><option value="XX">Otro país (avisanos cuál)</option></select>
+        <label for="acctRegion">Zona o provincia (opcional)</label>
+        <input type="text" id="acctRegion" maxlength="60" placeholder="ej.: San Juan" autocomplete="off">
+        <label class="chk"><input type="checkbox" id="acctTerms"> <span>Leí y acepto los <a href="terminos.html">términos de uso</a> y la <a href="privacy.html">política de privacidad</a>.</span></label>
+        <div class="row"><button id="acctSave" class="ok big-btn">Guardar mi perfil</button></div>
+      </div>
+      <div id="acctIn" hidden>
+        <p id="acctHello" class="mut"></p>
+        <div class="row"><button id="acctOutBtn" class="ghost">Salir</button><button id="acctDelete" class="ghost bad">Borrar mi cuenta</button></div>
+      </div>
+    </div>
     <div class="card" id="wantedCard" hidden>
       <h3>Palabras que buscamos</h3>
       <p class="mut">Tocá una palabra para mandar tu video de esa seña. El número es cuántas personas distintas ya aportaron y la meta. Cuando está completa, se deja de pedir.</p>
@@ -286,6 +309,7 @@ a{color:var(--acc)}
       <div id="cPrev"></div>
       <p class="mut">Consejos: filmá de frente, con buena luz y fondo liso; que se vean las manos y los brazos completos. <b>Conviene que no se vea tu cara</b>. Idealmente 3 repeticiones en el mismo video, de hasta 10 segundos. Para letras y números alcanza con una foto.</p>
       <label class="chk"><input type="checkbox" id="cConsent"> <span>Acepto que el equipo de Appsign vea este archivo para validar la seña y usarla solo para armar el vocabulario del traductor. Si quiero que se borre, puedo pedirlo.</span></label>
+      <p id="cNeedAcct" class="mut" hidden>Para mandar tu video, ingresá con tu cuenta de Google (arriba, en «Tu cuenta»).</p>
       <div class="row"><button id="cSend" class="ok big-btn" disabled>Enviar al equipo</button></div>
       <div id="cMsg" class="mut" role="status" aria-live="polite"></div>
       <div id="cContactInfo" class="mut"></div>

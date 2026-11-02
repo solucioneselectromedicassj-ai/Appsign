@@ -444,7 +444,6 @@ $('#corrSend').onclick = async () => {
   if (!sent) {
     const l = document.createElement('a'); l.href = URL.createObjectURL(f); l.download = f.name; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 3000);
     if (CONFIG.email) location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent('Appsign: correcciones')}&body=${encodeURIComponent(text + '\n\n(Adjuntá el archivo descargado)')}`;
-    else if (CONFIG.whatsapp) window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text)}`, '_blank');
   }
   if (confirm('¿Ya lo mandaste? Si querés, borro las señas guardadas de este celular.')) { corrSet([]); corrUI(); }
 };
@@ -463,7 +462,9 @@ function speak(text) {
 // ---------- Colaborar (el aporte NO entra a la app: va al equipo para validarlo) ----------
 const C = { file: null, url: '' };
 function collabUpdate() {
-  $('#cSend').disabled = !(C.file && normWord($('#cWord').value) && $('#cConsent').checked);
+  const acctOk = !AUTH_OK || !!(ses && profile);
+  $('#cNeedAcct').hidden = acctOk;
+  $('#cSend').disabled = !(C.file && normWord($('#cWord').value) && $('#cConsent').checked && acctOk);
 }
 function pickFile(f) {
   if (C.url) URL.revokeObjectURL(C.url);
@@ -479,26 +480,26 @@ $('#cVideo').onchange = e => { pickFile(e.target.files[0]); e.target.value = '';
 $('#cPhoto').onchange = e => { pickFile(e.target.files[0]); e.target.value = ''; };
 ['#cWord', '#cConsent'].forEach(s => $(s).addEventListener('input', collabUpdate));
 $('#cConsent').addEventListener('change', collabUpdate);
-$('#cContactInfo').textContent = CONFIG.email || CONFIG.whatsapp
-  ? `Se envía a ${CONFIG.equipo}${CONFIG.email ? ' · ' + CONFIG.email : ''}${CONFIG.whatsapp ? ' · WhatsApp +' + CONFIG.whatsapp : ''}.`
-  : 'Al enviar se abre el menú del celular para elegir cómo mandarlo (WhatsApp, correo…).';
+$('#cContactInfo').textContent = CONFIG.email
+  ? `Se envía por correo a ${CONFIG.equipo} (${CONFIG.email}) con el título de la palabra. El equipo descarga el video, lo procesa y borra el correo.`
+  : 'Al enviar se abre el menú del celular para elegir el correo del equipo.';
 $('#cSend').onclick = async () => {
   const f0 = C.file, w = normWord($('#cWord').value);
   if (!f0 || !w || !$('#cConsent').checked) return;
   const ext = (f0.name.split('.').pop() || (f0.type.startsWith('image/') ? 'jpg' : 'mp4')).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
   const f = new File([f0], `appsign-${w.replace(/[^\p{L}\p{N}]+/gu, '_')}.${ext}`, { type: f0.type });
   const text = ['Aporte para Appsign', 'Palabra: ' + w, 'Región: ' + ($('#cRegion').value.trim() || '—'), 'Contacto: ' + ($('#cContact').value.trim() || '—'),
-    'Acepto que el equipo vea este archivo para validar la seña y usarla solo para el vocabulario.'].join('\n');
+    ses && profile ? `ID de colaborador: ${ses.user.id} (${profile.rol}, ${profile.pais})` : '',
+    'Acepto que el equipo vea este archivo para validar la seña y usarla solo para el vocabulario. El equipo lo descarga, lo procesa en una computadora y borra este correo.'].filter(Boolean).join('\n');
   $('#cMsg').textContent = '';
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
-    try { await navigator.share({ files: [f], title: 'Appsign: ' + w, text }); $('#cMsg').textContent = '¡Gracias! Si elegiste dónde enviarlo, el equipo lo va a revisar.'; return; }
+    try { await navigator.share({ files: [f], title: w, text }); $('#cMsg').textContent = '¡Gracias! Si elegiste el correo del equipo, lo va a revisar.'; return; }
     catch (e) { if (e && e.name === 'AbortError') { $('#cMsg').textContent = 'Envío cancelado.'; return; } }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-  if (CONFIG.email) location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent('Appsign: ' + w)}&body=${encodeURIComponent(text + '\n\n(Adjuntá el archivo descargado)')}`;
-  else if (CONFIG.whatsapp) window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text)}`, '_blank');
-  $('#cMsg').textContent = 'Se descargó el archivo. Adjuntalo al mensaje que se abre para mandarlo al equipo.';
+  if (CONFIG.email) location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent(w)}&body=${encodeURIComponent(text + '\n\n(Adjuntá el archivo descargado)')}`;
+  $('#cMsg').textContent = CONFIG.email ? 'Se descargó el archivo. Adjuntalo al correo que se abre para mandarlo al equipo.' : 'Se descargó el archivo. Mandalo al equipo por correo.';
 };
 
 // ---------- Apariencia (tamaño de letra, fondo y color) ----------
@@ -768,6 +769,76 @@ function browFlag(t0, t1) {
   return win.length > 0 && Math.max(...win.map(x => x.v)) - base > 0.27;
 }
 
+// ---------- Cuenta: «Ingresar con Google» (Supabase Auth con PKCE; sin librerías de terceros) ----------
+const SB = (CONFIG.supabaseUrl || '').replace(/\/+$/, '');
+const AUTH_OK = !!(SB && CONFIG.supabaseKey);
+const SES_KEY = 'appsign-session', PKCE_KEY = 'appsign-pkce', TERMS_VERSION = '2026-11-02';
+let ses = null, profile = null;
+try { ses = JSON.parse(localStorage.getItem(SES_KEY) || 'null'); } catch (e) { /* sin storage */ }
+const saveSes = v => { ses = v; try { v ? localStorage.setItem(SES_KEY, JSON.stringify(v)) : localStorage.removeItem(SES_KEY); } catch (e) { /* sin storage */ } };
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const sesFrom = d => ({ access_token: d.access_token, refresh_token: d.refresh_token, expires_at: Date.now() + ((+d.expires_in || 3600) - 30) * 1000, user: { id: d.user && d.user.id, email: d.user && d.user.email } });
+async function authPost(path, body, bearer) {
+  const r = await fetch(SB + path, { method: 'POST', headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + (bearer || CONFIG.supabaseKey), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.status === 204 ? null : r.json().catch(() => null);
+}
+async function signIn() {
+  const ver = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const chal = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ver)));
+  try { sessionStorage.setItem(PKCE_KEY, ver); localStorage.setItem(PKCE_KEY, ver); } catch (e) { /* sin storage */ }
+  location.href = `${SB}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(location.origin + '/')}&code_challenge=${chal}&code_challenge_method=s256`;
+}
+async function finishSignIn() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname);
+  if (err) { acctMsg('No se pudo ingresar: ' + err); return; }
+  let ver = ''; try { ver = sessionStorage.getItem(PKCE_KEY) || localStorage.getItem(PKCE_KEY) || ''; sessionStorage.removeItem(PKCE_KEY); localStorage.removeItem(PKCE_KEY); } catch (e) { /* sin storage */ }
+  if (!ver) { acctMsg('No se pudo completar el ingreso. Probá de nuevo.'); return; }
+  try { saveSes(sesFrom(await authPost('/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: ver }))); } catch (e) { acctMsg('No se pudo completar el ingreso (' + e.message + ').'); }
+}
+async function validSes() {
+  if (!ses) return null;
+  if (Date.now() < ses.expires_at) return ses;
+  try { saveSes(sesFrom(await authPost('/auth/v1/token?grant_type=refresh_token', { refresh_token: ses.refresh_token }))); return ses; } catch (e) { saveSes(null); profile = null; return null; }
+}
+async function sb(path, opts = {}) {   // pedido a Supabase con la sesión (si hay) o con la clave pública
+  const t = await validSes();
+  return fetch(SB + path, { ...opts, headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + (t ? t.access_token : CONFIG.supabaseKey), 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+}
+async function loadProfile() {
+  profile = null; if (!AUTH_OK || !(await validSes())) return;
+  try { const r = await sb('/rest/v1/perfiles?select=rol,pais,region,rol_verificado&limit=1'); if (r.ok) { const a = await r.json(); profile = a[0] || null; } } catch (e) { /* sin red */ }
+}
+function acctMsg(t) { const m = $('#acctMsg'); if (m) m.textContent = t || ''; }
+const ROLES = { sorda: 'persona sorda', interprete: 'intérprete', docente: 'docente de LSA', aprendiz: 'estudiante de LSA' };
+function renderAcct() {
+  const c = $('#acctCard'); if (!c) return; c.hidden = !AUTH_OK; if (!AUTH_OK) return;
+  const out = !ses, form = !!ses && !profile, ok = !!ses && !!profile;
+  $('#acctOut').hidden = !out; $('#acctForm').hidden = !form; $('#acctIn').hidden = !ok;
+  if (form) $('#acctWho').textContent = ses.user.email || 'tu cuenta';
+  if (ok) $('#acctHello').textContent = `Hola, ${ses.user.email || 'colaborador/a'}. Rol: ${ROLES[profile.rol] || profile.rol} · país ${profile.pais}${profile.region ? ' · ' + profile.region : ''} · ${profile.rol_verificado ? 'verificado ✓' : 'pendiente de verificación por el equipo'}.`;
+  collabUpdate(); renderValidar();
+}
+$('#acctGoogle').onclick = () => signIn();
+$('#acctSave').onclick = async () => {
+  const rol = ($('#acctRol').value || ''), pais = $('#acctPais').value, region = $('#acctRegion').value.trim().slice(0, 60) || null;
+  if (!rol) { acctMsg('Elegí cómo te presentás.'); return; }
+  if (!$('#acctTerms').checked) { acctMsg('Hace falta aceptar los términos de uso.'); return; }
+  try {
+    const r = await sb('/rest/v1/perfiles', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ usuario: ses.user.id, rol, pais, region, terminos: TERMS_VERSION, terminos_fecha: new Date().toISOString() }) });
+    if (!r.ok && r.status !== 409) throw new Error('HTTP ' + r.status);
+    await loadProfile(); acctMsg(profile ? '¡Listo! Ya podés mandar videos y votar con tu cuenta.' : ''); renderAcct();
+  } catch (e) { acctMsg('No se pudo guardar tu perfil (' + e.message + ').'); }
+};
+$('#acctOutBtn').onclick = async () => { const t = await validSes(); try { if (t) await authPost('/auth/v1/logout', {}, t.access_token); } catch (e) { /* igual se cierra acá */ } saveSes(null); profile = null; acctMsg('Saliste de tu cuenta.'); renderAcct(); };
+$('#acctDelete').onclick = async () => {
+  if (!confirm('¿Borrar tu cuenta? Se elimina tu perfil y tu ingreso. Tus votos quedan sin tu nombre. No se puede deshacer.')) return;
+  try { const r = await sb('/rest/v1/rpc/borrar_mi_cuenta', { method: 'POST', body: '{}' }); if (!r.ok) throw new Error('HTTP ' + r.status); saveSes(null); profile = null; acctMsg('Tu cuenta fue borrada.'); renderAcct(); }
+  catch (e) { acctMsg('No se pudo borrar (' + e.message + '). Escribinos desde Sugerencias y errores.'); }
+};
+
 // ---------- Ayudar a validar: se votan señas candidatas; los votos van a un servidor y solo se leen sumados ----------
 const VOTE_OK = !!(CONFIG.supabaseUrl && CONFIG.supabaseKey);
 const VS_KEY = 'appsign-voter';
@@ -797,8 +868,9 @@ function renderValidar() {
   clearInterval(candTimer);
   const left = candidates.filter(c => !voter.voted.includes(c.id) && !voter.skipped.includes(c.id)).length;
   $('#valCount').textContent = voter.voted.length ? `Ya validaste ${voter.voted.length} ${voter.voted.length === 1 ? 'seña' : 'señas'}. ¡Gracias!` : 'Todavía no validaste ninguna.';
-  $('#valRole').hidden = !!voter.role; $('#valWork').hidden = !voter.role;
-  if (!voter.role) return;
+  const hasRole = !!(voter.role || profile);
+  $('#valRole').hidden = hasRole; $('#valWork').hidden = !hasRole;
+  if (!hasRole) return;
   curCand = nextCandidate();
   $('#valEmpty').hidden = !!curCand; $('#valBox').hidden = !curCand;
   if (!curCand) return;
@@ -813,9 +885,9 @@ async function castVote(kind) {
   if (!curCand) return;
   const msg = $('#valMsg'); msg.textContent = '';
   if (kind === 'skip') { voter.skipped.push(curCand.id); saveVoter(); renderValidar(); return; }
-  const body = { candidata: curCand.id, palabra: curCand.word, voto: kind, variante: ((kind === 'distinta' || kind === 'otra') && $('#valVar').value.trim().slice(0, 120)) || null, rol_declarado: voter.role, region: voter.region || null, dispositivo: voter.id, lengua: CONFIG.lengua || 'LSA', pais: CONFIG.pais || 'AR' };
+  const body = { candidata: curCand.id, palabra: curCand.word, voto: kind, variante: ((kind === 'distinta' || kind === 'otra') && $('#valVar').value.trim().slice(0, 120)) || null, rol_declarado: (profile && profile.rol) || voter.role, region: (profile && profile.region) || voter.region || null, dispositivo: voter.id, lengua: CONFIG.lengua || 'LSA', pais: CONFIG.pais || 'AR' };
   try {
-    const r = await fetch(CONFIG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/votos', { method: 'POST', headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+    const r = await sb('/rest/v1/votos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
     if (!r.ok && r.status !== 409) throw new Error('HTTP ' + r.status);
     voter.voted.push(curCand.id); saveVoter(); cue('ok'); renderValidar();
   } catch (e) { msg.textContent = 'No se pudo guardar el voto (' + (e.message || e.name) + '). Probá de nuevo con internet.'; }
@@ -837,7 +909,7 @@ $('#fbSend').onclick = async () => {
   if (VOTE_OK) {
     try {
       const body = { tipo, mensaje, contacto, pantalla: tab, version: String(globalThis.APP_VERSION || '').slice(0, 40), tecnico: tech && tech.slice(0, 300), lengua: CONFIG.lengua || 'LSA', pais: CONFIG.pais || 'AR', dispositivo: voter.id };
-      const r = await fetch(CONFIG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/sugerencias', { method: 'POST', headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+      const r = await sb('/rest/v1/sugerencias', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       $('#fbMsg').value = ''; fbCheck(); msg.textContent = '¡Gracias! Recibimos tu mensaje.'; return;
     } catch (e) { msg.textContent = 'No se pudo enviar (' + (e.message || e.name) + '). Lo intentamos por otro medio.'; }
@@ -846,7 +918,6 @@ $('#fbSend').onclick = async () => {
   const text = `Appsign · ${tipo === 'error' ? 'Error' : tipo === 'sugerencia' ? 'Sugerencia' : 'Mensaje'}\n\n${mensaje}${contacto ? '\n\nContacto: ' + contacto : ''}${tech ? '\n\n(' + tech + ')' : ''}`;
   if (navigator.share) { try { await navigator.share({ title: 'Appsign: ' + tipo, text }); msg.textContent = 'Listo: elegí a quién mandarlo.'; return; } catch (e) { if (e && e.name === 'AbortError') { msg.textContent = 'Envío cancelado.'; return; } } }
   if (CONFIG.email) { location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent('Appsign: ' + tipo)}&body=${encodeURIComponent(text)}`; return; }
-  if (CONFIG.whatsapp) { window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text)}`, '_blank'); return; }
   try { await navigator.clipboard.writeText(text); msg.textContent = 'Copiamos tu mensaje: pegalo donde quieras mandarlo al equipo.'; } catch (e) { msg.textContent = 'No pudimos enviarlo desde acá. Escribinos desde la sección Colaborar.'; }
 };
 
@@ -902,7 +973,7 @@ $('#btnCam').onclick = () => (mode === 'camera' ? stopSource() : startCamera());
 
 // ---------- Inicio ----------
 (async function init() {
-  loadCandidates(); loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); installUI(); renderSpell(); renderTranscript(); updateUI();
+  loadCandidates(); loadSettingsUI(); cvApplySettings(); if (AUTH_OK) finishSignIn().then(loadProfile).then(renderAcct); else renderAcct(); cvRender(); micBtnUI(); camBtnUI(); installUI(); renderSpell(); renderTranscript(); updateUI();
   await loadLibrary();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   window.__lsa = { version: globalThis.APP_VERSION, get lib() { return lib; }, get phrases() { return phrases; }, transcript, renderTranscript, get meta() { return libMeta; }, S, rank, prepare, resample };
