@@ -104,6 +104,8 @@ input[type=range]{accent-color:var(--acc)}
 .sp{display:inline-block;width:1em}
 .spellword{font-size:2rem;line-height:1.3;min-height:2.6rem}
 .qb{display:inline-grid;place-items:center;width:1.25em;height:1.25em;margin-left:6px;border-radius:50%;background:var(--acc-btn);color:var(--acc-ink);font-size:.8em}
+.wants{display:flex;flex-wrap:wrap;gap:8px}.want{padding:8px 14px}.want span{margin-left:6px;color:var(--mut);font-size:.85em}.want.done{opacity:.6}
+#valCv{width:100%;max-width:340px;aspect-ratio:1;display:block;margin:10px auto;background:var(--bg);border-radius:14px;border:1px solid var(--line)}
 .chip.unk{color:var(--warn);border-style:dashed}
 .chip.last{border-color:var(--acc);box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 30%,transparent)}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
@@ -257,6 +259,11 @@ a{color:var(--acc)}
 
   <!-- COLABORAR -->
   <section id="tab-collab">
+    <div class="card" id="wantedCard" hidden>
+      <h3>Palabras que buscamos</h3>
+      <p class="mut">Tocá una palabra para mandar tu video de esa seña. El número es cuántas personas distintas ya aportaron y la meta. Cuando está completa, se deja de pedir.</p>
+      <div id="wantedList" class="wants"></div>
+    </div>
     <div class="card">
       <div class="hero">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.500-9 9-9 9z"/></svg>
@@ -289,6 +296,35 @@ a{color:var(--acc)}
       <p class="mut" id="corrOff">Está apagado. Activalo en Ajustes → «Ayudar a mejorar la app».</p>
       <p id="corrCount" class="mut" role="status"></p>
       <div class="row"><button id="corrSend" class="ok big-btn" disabled>Enviar al equipo</button></div>
+    </div>
+    <div class="card" id="valCard" hidden>
+      <h3>Ayudar a validar señas</h3>
+      <p class="mut">Mirá una seña dibujada con las manos y decí si es correcta para esa palabra. Las señas se aprueban cuando varias personas, entre ellas personas sordas o intérpretes, coinciden. <b>Tu voto es anónimo</b> y no entra solo al vocabulario: el equipo revisa los resultados.</p>
+      <p class="mut" id="valCount"></p>
+      <div id="valRole">
+        <label for="valRegion">¿De qué zona sos? (opcional)</label>
+        <input type="text" id="valRegion" placeholder="ej.: San Juan" autocomplete="off">
+        <p class="mut" style="margin-top:12px">¿Cómo te presentás? Elegí lo que sea cierto: pesa distinto en la votación.</p>
+        <div class="opts">
+          <button data-role="sorda">Soy una persona sorda</button><button data-role="interprete">Soy intérprete</button>
+          <button data-role="docente">Soy docente de LSA</button><button data-role="aprendiz">Estoy aprendiendo</button>
+        </div>
+      </div>
+      <div id="valWork" hidden>
+        <div id="valBox">
+          <div class="mut" id="valLeft"></div>
+          <canvas id="valCv" width="360" height="360" aria-label="Seña dibujada con las manos"></canvas>
+          <div class="big" id="valWord" style="text-align:center;min-height:0;font-weight:700"></div>
+          <p class="mut" style="text-align:center;margin:0">¿Esta es la seña de esa palabra?</p>
+          <div class="row"><button id="valOk" class="ok big-btn">Sí, es correcta</button></div>
+          <div class="row"><button id="valDiff" class="big-btn">Se hace distinto</button><button id="valWrong" class="big-btn">Es otra palabra</button></div>
+          <div id="valVarBox" hidden><input type="text" id="valVar" maxlength="120" placeholder="Contanos (opcional)" autocomplete="off"><div class="row"><button id="valVarSend" class="pri">Enviar</button></div></div>
+          <div class="row"><button id="valSkip" class="ghost">No puedo juzgarla (saltar)</button></div>
+          <div id="valMsg" class="mut" role="status" aria-live="polite"></div>
+        </div>
+        <p id="valEmpty" class="mut" hidden>Ya miraste todas las señas disponibles. ¡Gracias! Cuando haya nuevas, aparecen acá.</p>
+        <div class="row"><button id="valChange" class="ghost">Cambiar cómo me presento</button></div>
+      </div>
     </div>
   </section>
 

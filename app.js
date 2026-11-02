@@ -20,7 +20,7 @@ if (S.v < 3) { if (S.accent === 'blue') S.accent = 'marea'; S.v = 3; }
 const saveS = () => { try { localStorage.setItem('lsa-settings', JSON.stringify(S)); } catch (e) { /* ignorar */ } };
 
 // ---------- Biblioteca (solo lo que viene en library.json, publicado por el equipo) ----------
-let lib = [], libMeta = { version: '', words: 0, validated: true, threshold: 0 }, phrases = [];
+let lib = [], libMeta = { version: '', words: 0, validated: true, threshold: 0 }, phrases = [], wanted = [];
 const libOf = () => lib;
 let thrMemo = null;
 function threshold() {
@@ -41,7 +41,8 @@ async function loadLibrary() {
     lib = d.samples.filter(validSample).map((s, i) => ({ id: i, word: normWord(s.word), feat: prepare(s.frames.map(fr => Float32Array.from(fr, v => v / k))), raw: s.frames.map(fr => fr.map(v => v / k)) })).filter(s => s.word);
     libMeta = { version: String(d.version || ''), words: new Set(lib.map(s => s.word)).size, validated: d.validated !== false, threshold: Number(d.threshold) > 0 ? Number(d.threshold) : 0 };
     phrases = (Array.isArray(d.phrases) ? d.phrases : []).map(p => ({ signs: (p.signs || []).map(normWord).filter(Boolean), text: String(p.text || '').trim() })).filter(p => p.signs.length >= 2 && p.text);
-  } catch (e) { lib = []; phrases = []; libMeta = { version: '', words: 0, validated: true }; console.warn('library.json:', e.message); }
+    wanted = (Array.isArray(d.wanted) ? d.wanted : []).map(w => ({ word: normWord(w.word), have: Math.max(0, +w.have || 0), goal: Math.max(1, +w.goal || 5) })).filter(w => w.word);
+  } catch (e) { lib = []; phrases = []; wanted = []; libMeta = { version: '', words: 0, validated: true }; console.warn('library.json:', e.message); }
   thrMemo = null; syncSpotter();
   announceUpdate();
   renderLibInfo();
@@ -61,7 +62,15 @@ function announceUpdate() {
     $('#newsOk').onclick = () => { mark(); box.style.display = 'none'; };
   } else box.style.display = 'none';
 }
+function renderWanted() {
+  const card = $('#wantedCard'); if (!card) return;
+  card.hidden = !wanted.length;
+  $('#wantedList').innerHTML = wanted.map(w => `<button class="want ${w.have >= w.goal ? 'done' : ''}" data-w="${esc(w.word)}" ${w.have >= w.goal ? 'disabled' : ''}>${esc(w.word)} <span>${w.have >= w.goal ? '✓' : w.have + '/' + w.goal}</span></button>`).join('');
+}
+$('#wantedList').addEventListener('click', e => { const b = e.target.closest('button[data-w]'); if (!b) return; $('#cWord').value = b.dataset.w; collabUpdate(); $('#cWord').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+
 function renderLibInfo() {
+  renderWanted();
   $('#testBanner').style.display = lib.length && !libMeta.validated ? '' : 'none';
   const t = lib.length ? `Vocabulario ${/^\d/.test(libMeta.version) ? 'v' : ''}${libMeta.version}: ${libMeta.words} palabras (${lib.length} muestras) · umbral ${threshold().toFixed(3)}${S.auto ? (libMeta.threshold ? ' (fijado por el equipo)' : ' (auto)') : ''}` : 'Todavía no hay vocabulario cargado en esta versión.';
   $('#libInfo').textContent = t; $('#libInfo2').textContent = t;
@@ -382,8 +391,8 @@ function sampleBounds(fr) {
   fr.forEach(f => [0, 1].forEach(sl => { if (!presentSlot(f, sl)) return; for (let p = 0; p < 21; p++) { const x = f[sl * HAND_LEN + p * 3], y = f[sl * HAND_LEN + p * 3 + 1]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } }));
   return { x0, y0, w: Math.max(0.05, x1 - x0), h: Math.max(0.05, y1 - y0) };
 }
-function drawCmpFrame(fr, bd) {
-  const cv = $('#cmpCv'), g = cv.getContext('2d'), W = cv.width, sc = 0.82 * W / Math.max(bd.w, bd.h);
+function drawCmpFrame(fr, bd, cv = $('#cmpCv')) {
+  const g = cv.getContext('2d'), W = cv.width, sc = 0.82 * W / Math.max(bd.w, bd.h);
   g.clearRect(0, 0, W, W);
   const X = x => W / 2 + (x - bd.x0 - bd.w / 2) * sc, Y = y => W / 2 + (y - bd.y0 - bd.h / 2) * sc;
   [0, 1].forEach(sl => {
@@ -759,6 +768,64 @@ function browFlag(t0, t1) {
   return win.length > 0 && Math.max(...win.map(x => x.v)) - base > 0.27;
 }
 
+// ---------- Ayudar a validar: se votan señas candidatas; los votos van a un servidor y solo se leen sumados ----------
+const VOTE_OK = !!(CONFIG.supabaseUrl && CONFIG.supabaseKey);
+const VS_KEY = 'appsign-voter';
+let voter = { id: '', role: '', region: '', voted: [], skipped: [] };
+try { voter = { ...voter, ...JSON.parse(localStorage.getItem(VS_KEY) || '{}') }; } catch (e) { /* sin storage */ }
+if (!voter.id) voter.id = (crypto.randomUUID ? crypto.randomUUID() : '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
+const saveVoter = () => { try { localStorage.setItem(VS_KEY, JSON.stringify(voter)); } catch (e) { /* sin storage */ } };
+let candidates = [], curCand = null, candTimer = 0;
+async function loadCandidates() {
+  if (!VOTE_OK) return;
+  try {
+    const r = await fetch('candidatas.json', { cache: 'no-cache' }); if (!r.ok) return;
+    const d = await r.json(); if (d.format !== 'appsign-candidates-v1' || !Array.isArray(d.candidates)) return;
+    const k = d.scale || 1000;
+    candidates = d.candidates.filter(c => c && typeof c.id === 'string' && typeof c.word === 'string' && Array.isArray(c.frames) && c.frames.length === T && c.frames.every(fr => Array.isArray(fr) && fr.length === FRAME_LEN)).map(c => ({ id: c.id, word: normWord(c.word), raw: c.frames.map(fr => Float32Array.from(fr, v => v / k)) }));
+  } catch (e) { console.warn('candidatas.json:', e.message); }
+  renderValidar();
+}
+function nextCandidate() {
+  const pend = candidates.filter(c => !voter.voted.includes(c.id) && !voter.skipped.includes(c.id));
+  return pend.length ? pend[Math.floor(Math.random() * pend.length)] : null;
+}
+function renderValidar() {
+  const card = $('#valCard'); if (!card) return;
+  card.hidden = !(VOTE_OK && candidates.length);
+  if (card.hidden) return;
+  clearInterval(candTimer);
+  const left = candidates.filter(c => !voter.voted.includes(c.id) && !voter.skipped.includes(c.id)).length;
+  $('#valCount').textContent = voter.voted.length ? `Ya validaste ${voter.voted.length} ${voter.voted.length === 1 ? 'seña' : 'señas'}. ¡Gracias!` : 'Todavía no validaste ninguna.';
+  $('#valRole').hidden = !!voter.role; $('#valWork').hidden = !voter.role;
+  if (!voter.role) return;
+  curCand = nextCandidate();
+  $('#valEmpty').hidden = !!curCand; $('#valBox').hidden = !curCand;
+  if (!curCand) return;
+  $('#valLeft').textContent = `Quedan ${left} por mirar`;
+  $('#valWord').textContent = curCand.word; $('#valVar').value = ''; $('#valVarBox').hidden = true;
+  const cv = $('#valCv'), bd = sampleBounds(curCand.raw); let k = 0; drawCmpFrame(curCand.raw[0], bd, cv);
+  candTimer = setInterval(() => { k = (k + 1) % curCand.raw.length; drawCmpFrame(curCand.raw[k], bd, cv); }, 140);
+}
+document.querySelectorAll('#valRole button[data-role]').forEach(b => b.onclick = () => { voter.role = b.dataset.role; voter.region = $('#valRegion').value.trim().slice(0, 60); saveVoter(); renderValidar(); });
+$('#valChange').onclick = () => { voter.role = ''; saveVoter(); renderValidar(); };
+async function castVote(kind) {
+  if (!curCand) return;
+  const msg = $('#valMsg'); msg.textContent = '';
+  if (kind === 'skip') { voter.skipped.push(curCand.id); saveVoter(); renderValidar(); return; }
+  const body = { candidata: curCand.id, palabra: curCand.word, voto: kind, variante: ((kind === 'distinta' || kind === 'otra') && $('#valVar').value.trim().slice(0, 120)) || null, rol: voter.role, region: voter.region || null, dispositivo: voter.id };
+  try {
+    const r = await fetch(CONFIG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/votos', { method: 'POST', headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+    if (!r.ok && r.status !== 409) throw new Error('HTTP ' + r.status);
+    voter.voted.push(curCand.id); saveVoter(); cue('ok'); renderValidar();
+  } catch (e) { msg.textContent = 'No se pudo guardar el voto (' + (e.message || e.name) + '). Probá de nuevo con internet.'; }
+}
+$('#valOk').onclick = () => castVote('correcta');
+$('#valDiff').onclick = () => { $('#valVarBox').hidden = false; $('#valVar').placeholder = '¿Cómo se hace donde vivís? (opcional)'; $('#valVarSend').dataset.kind = 'distinta'; };
+$('#valWrong').onclick = () => { $('#valVarBox').hidden = false; $('#valVar').placeholder = '¿Qué palabra es? (opcional)'; $('#valVarSend').dataset.kind = 'otra'; };
+$('#valVarSend').onclick = () => castVote($('#valVarSend').dataset.kind || 'distinta');
+$('#valSkip').onclick = () => castVote('skip');
+
 // ---------- Instalar y compartir ----------
 let installEvt = null;
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || /[?&]source=(apk|pwa)/.test(location.search);
@@ -811,7 +878,7 @@ $('#btnCam').onclick = () => (mode === 'camera' ? stopSource() : startCamera());
 
 // ---------- Inicio ----------
 (async function init() {
-  loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); installUI(); renderSpell(); renderTranscript(); updateUI();
+  loadCandidates(); loadSettingsUI(); cvApplySettings(); cvRender(); micBtnUI(); camBtnUI(); installUI(); renderSpell(); renderTranscript(); updateUI();
   await loadLibrary();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   window.__lsa = { version: globalThis.APP_VERSION, get lib() { return lib; }, get phrases() { return phrases; }, transcript, renderTranscript, get meta() { return libMeta; }, S, rank, prepare, resample };

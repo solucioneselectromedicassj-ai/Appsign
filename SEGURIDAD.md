@@ -24,3 +24,9 @@
 - Titular y responsable: Soluciones Electromédicas SJ. Falta confirmar razón social, CUIT y correo de contacto para la tienda.
 - Decidido: el repositorio `Appsign` sigue público (código visible, sin permiso de uso). Pendiente de decidir: registro de la marca «Appsign» (INPI) y del software (Dirección Nacional del Derecho de Autor); acuerdo con la fundación sobre quién es titular del vocabulario.
 - Ningún secreto vive en el repositorio: la llave de firma de la tienda va en GitHub Secrets.
+
+## Validación comunitaria (votos)
+- Los votos van a un proyecto de Supabase aparte (cuenta del equipo). La app usa la clave pública «anon», que por diseño va dentro del código. La clave de servicio NUNCA va en este repositorio ni en la app.
+- Con las reglas de seguridad de la base (`docs/supabase/votos.sql` en el repo privado del Constructor), la clave pública solo puede **insertar** votos y leer **totales** (sin saber quién votó). No puede leer, cambiar ni borrar votos sueltos.
+- Límite: sin cuentas, el identificador de dispositivo se puede falsear. Etapa 2: roles con códigos de invitación.
+- Los videos de quienes colaboran nunca se muestran a los votantes: se ve la seña dibujada con puntos.
