@@ -96,6 +96,32 @@ const MP_SOURCES = [
   { label: 'archivos propios', mod: './mp/vision_bundle.mjs', wasm: 'mp/wasm', model: 'mp/hand_landmarker.task', face: 'mp/blaze_face_short_range.tflite', flm: 'mp/face_landmarker.task' },
 ];
 
+// Descarga del reconocedor con barra de progreso (la primera vez son unos 12 a 18 MB; después queda guardado en el celular)
+const SIMD_OK = (() => { try { return WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11])); } catch (e) { return false; } })();
+function dlShow(frac, slow) {
+  const box = $('#dl'); if (!box) return;
+  box.hidden = false;
+  $('#dlTxt').textContent = frac == null ? 'Preparando el reconocedor…' : `Descargando el reconocedor… ${Math.min(99, Math.round(frac * 100))} %`;
+  $('#dlBar').value = frac == null ? 0 : Math.min(1, frac);
+  $('#dlNote').textContent = 'Se baja una sola vez (unos 12 a 18 MB) y después queda guardado en tu celular. Conviene tener Wi-Fi.' + (slow ? ' Tu conexión parece lenta: puede tardar varios minutos.' : '');
+}
+const dlHide = () => { const b = $('#dl'); if (b) b.hidden = true; };
+async function prefetchModel(src) {
+  const base = src.wasm.replace(/\/+$/, '') + '/vision_wasm' + (SIMD_OK ? '' : '_nosimd') + '_internal';
+  const items = [[src.mod, 136870], [base + '.js', 209826], [base + '.wasm', SIMD_OK ? 9423986 : 9294247], [src.model, 7819105]];
+  const total = items.reduce((a, i) => a + i[1], 0); let got = 0, shown = false;
+  const c = navigator.connection || {}, slow = !!(c.saveData || /(^|-)2g|3g/.test(c.effectiveType || ''));
+  const timer = setTimeout(() => { shown = true; dlShow(got / total, slow); }, 500);   // si ya estaba guardado, ni se nota
+  try {
+    for (const [url] of items) {
+      const r = await fetch(url); if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+      const rd = r.body.getReader();
+      for (;;) { const { done, value } = await rd.read(); if (done) break; got += value.length; const f = got / total; if (shown) { dlShow(f, slow); setStatus(`Descargando ${Math.min(99, Math.round(f * 100))} %`); } }
+    }
+  } catch (e) { /* si falla, la carga normal de abajo informa el paso que falló */ }
+  clearTimeout(timer);
+}
+
 async function loadModel() {
   if (landmarker) return;
   setStatus('Cargando…');
@@ -103,6 +129,7 @@ async function loadModel() {
   for (const src of MP_SOURCES) {
     let step = 'motor';
     try {
+      await prefetchModel(src);
       const mp = await import(src.mod);
       step = 'wasm';
       const fs = await mp.FilesetResolver.forVisionTasks(src.wasm);
@@ -113,11 +140,12 @@ async function loadModel() {
       });
       try { landmarker = await mk('GPU'); } catch (e) { landmarker = await mk('CPU'); }
       mpKit = { mp, fs, src };
-      setStatus('Reconocedor listo', 'ok');
+      dlHide(); setStatus('Reconocedor listo', 'ok');
       return;
     } catch (e) { fails.push(`${src.label} (${step}): ${e.message || e.name}`); }
   }
-  throw new Error('No se pudo cargar el reconocedor. ' + fails.join(' | '));
+  dlHide();
+  throw new Error('No se pudo cargar el reconocedor. ' + fails.join(' | ') + ' · Revisá tu conexión y volvé a tocar «Activar cámara».');
 }
 
 async function stopSource() {

@@ -1,0 +1,25 @@
+# Cloudflare Pages: mismas cabeceras que vercel.json (se generó desde ahí). Si cambiás una, cambiá la otra.
+
+/.well-known/assetlinks.json
+  Content-Type: application/json
+  Cache-Control: no-cache
+
+/library.json
+  Cache-Control: no-cache
+
+/candidatas.json
+  Cache-Control: no-cache
+
+/sw.js
+  Cache-Control: no-cache
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: data: https://*.supabase.co; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), bluetooth=(), serial=(), interest-cohort=()
+
+/mp/*
+  Cache-Control: public, max-age=31536000, immutable

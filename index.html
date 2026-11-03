@@ -178,6 +178,8 @@ a{color:var(--acc)}
   <div id="news" class="card" style="display:none;border-color:var(--ok)"></div>
   <div id="testBanner" class="card" style="display:none;border-color:var(--warn)"><b>Vocabulario de prueba.</b> Estas señas todavía no fueron validadas por la comunidad sorda: sirven para probar la app entre nosotros, no para confiar en la traducción.</div>
 
+  <div id="dl" class="card" hidden role="status" aria-live="polite"><b id="dlTxt"></b><progress id="dlBar" max="1" value="0" style="width:100%;margin:8px 0"></progress><div id="dlNote" class="mut"></div></div>
+
   <!-- Escenario de cámara, compartido por Traducir y Conversar -->
   <div id="stage">
     <video id="video" playsinline muted></video>
