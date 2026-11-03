@@ -64,6 +64,8 @@ function announceUpdate() {
 }
 function renderWanted() {
   const card = $('#wantedCard'); if (!card) return;
+  const dl = $('#wordList'); if (dl && wanted.length) dl.innerHTML = wanted.filter(w => w.have < w.goal).map(w => `<option value="${esc(w.word)}">`).join('');
+  if ($('#cWord')) collabUpdate();
   card.hidden = !wanted.length;
   $('#wantedList').innerHTML = wanted.map(w => `<button class="want ${w.have >= w.goal ? 'done' : ''}" data-w="${esc(w.word)}" ${w.have >= w.goal ? 'disabled' : ''}>${esc(w.word)} <span>${w.have >= w.goal ? '✓' : w.have + '/' + w.goal}</span></button>`).join('');
 }
@@ -77,7 +79,7 @@ function renderLibInfo() {
   $('#verInfo').textContent = `Appsign ${globalThis.APP_VERSION || '?'} · vocabulario ${libMeta.version || '—'}${libMeta.validated ? '' : ' (de prueba)'}`;
   const words = [...new Set(lib.map(s => s.word))].sort((a, b) => a.localeCompare(b, 'es'));
   $('#vocabList').textContent = words.join(' · ') || '—';
-  $('#wordList').innerHTML = words.map(w => `<option value="${esc(w)}">`).join('');
+  if (!wanted.length) $('#wordList').innerHTML = words.map(w => `<option value="${esc(w)}">`).join('');
 }
 
 // ---------- Estado de la UI ----------
@@ -461,10 +463,21 @@ function speak(text) {
 
 // ---------- Colaborar (el aporte NO entra a la app: va al equipo para validarlo) ----------
 const C = { file: null, url: '' };
+// Cupo por palabra: si el equipo publicó una lista de «palabras que buscamos», solo se aceptan esas y mientras no estén completas.
+function wordStatus() {
+  const w = normWord($('#cWord').value); if (!w) return { w, state: 'empty' };
+  const hit = wanted.find(x => x.word === w);
+  if (hit) return hit.have >= hit.goal ? { w, state: 'full', hit } : { w, state: 'ok', hit };
+  if (lib.some(s => s.word === w)) return { w, state: 'have' };           // ya está en el vocabulario aprobado
+  return wanted.length ? { w, state: 'notwanted' } : { w, state: 'ok' };   // sin lista publicada: se acepta cualquiera (como antes)
+}
 function collabUpdate() {
   const acctOk = !AUTH_OK || !!(ses && profile);
   $('#cNeedAcct').hidden = acctOk;
-  $('#cSend').disabled = !(C.file && normWord($('#cWord').value) && $('#cConsent').checked && acctOk);
+  const st = wordStatus(), m = $('#cWordMsg');
+  const txt = { full: `«${st.w}» ya tiene todos los aportes que necesitamos. ¡Gracias! Probá con otra palabra de la lista.`, have: `«${st.w}» ya está en el vocabulario. Probá con una de «Palabras que buscamos».`, notwanted: `«${st.w}» no está en la lista de palabras que buscamos ahora. Podés proponerla en «Sugerencias y errores» (Ajustes).`, ok: st.hit ? `Faltan ${st.hit.goal - st.hit.have} aporte${st.hit.goal - st.hit.have === 1 ? '' : 's'} de «${st.w}». ¡Gracias por sumar!` : '', empty: '' }[st.state];
+  m.textContent = txt; m.dataset.kind = st.state;
+  $('#cSend').disabled = !(C.file && st.w && st.state === 'ok' && $('#cConsent').checked && acctOk);
 }
 function pickFile(f) {
   if (C.url) URL.revokeObjectURL(C.url);
