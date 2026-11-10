@@ -837,7 +837,7 @@ async function finishSignIn() {
   if (err) { acctMsg('No se pudo ingresar: ' + err); return; }
   let ver = ''; try { ver = sessionStorage.getItem(PKCE_KEY) || localStorage.getItem(PKCE_KEY) || ''; sessionStorage.removeItem(PKCE_KEY); localStorage.removeItem(PKCE_KEY); } catch (e) { /* sin storage */ }
   if (!ver) { acctMsg('No se pudo completar el ingreso. Probá de nuevo.'); return; }
-  try { saveSes(sesFrom(await authPost('/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: ver }))); } catch (e) { acctMsg('No se pudo completar el ingreso (' + e.message + ').'); }
+  try { saveSes(sesFrom(await authPost('/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: ver }))); } catch (e) { { console.warn('login:', e.message); acctMsg('No se pudo completar el ingreso. Probá de nuevo.'); }; }
 }
 async function validSes() {
   if (!ses) return null;
@@ -871,13 +871,13 @@ $('#acctSave').onclick = async () => {
     const r = await sb('/rest/v1/perfiles', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ usuario: ses.user.id, rol, pais, region, terminos: TERMS_VERSION, terminos_fecha: new Date().toISOString() }) });
     if (!r.ok && r.status !== 409) throw new Error('HTTP ' + r.status);
     await loadProfile(); acctMsg(profile ? '¡Listo! Ya podés mandar videos y votar con tu cuenta.' : ''); renderAcct();
-  } catch (e) { acctMsg('No se pudo guardar tu perfil (' + e.message + ').'); }
+  } catch (e) { { console.warn('perfil:', e.message); acctMsg('No se pudo guardar tu perfil. Probá de nuevo.'); }; }
 };
 $('#acctOutBtn').onclick = async () => { const t = await validSes(); try { if (t) await authPost('/auth/v1/logout', {}, t.access_token); } catch (e) { /* igual se cierra acá */ } saveSes(null); profile = null; acctMsg('Saliste de tu cuenta.'); renderAcct(); };
 $('#acctDelete').onclick = async () => {
   if (!confirm('¿Borrar tu cuenta? Se elimina tu perfil y tu ingreso. Tus votos quedan sin tu nombre. No se puede deshacer.')) return;
   try { const r = await sb('/rest/v1/rpc/borrar_mi_cuenta', { method: 'POST', body: '{}' }); if (!r.ok) throw new Error('HTTP ' + r.status); saveSes(null); profile = null; acctMsg('Tu cuenta fue borrada.'); renderAcct(); }
-  catch (e) { acctMsg('No se pudo borrar (' + e.message + '). Escribinos desde Sugerencias y errores.'); }
+  catch (e) { { console.warn('borrar:', e.message); acctMsg('No se pudo borrar. Escribinos desde Sugerencias y errores.'); } }
 };
 
 // ---------- Ayudar a validar: se votan señas candidatas; los votos van a un servidor y solo se leen sumados ----------
@@ -931,7 +931,7 @@ async function castVote(kind) {
     const r = await sb('/rest/v1/votos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
     if (!r.ok && r.status !== 409) throw new Error('HTTP ' + r.status);
     voter.voted.push(curCand.id); saveVoter(); cue('ok'); renderValidar();
-  } catch (e) { msg.textContent = 'No se pudo guardar el voto (' + (e.message || e.name) + '). Probá de nuevo con internet.'; }
+  } catch (e) { msg.textContent = (console.warn('voto:', e.message || e.name), 'No se pudo guardar el voto. Probá de nuevo con internet.'); }
 }
 $('#valOk').onclick = () => castVote('correcta');
 $('#valDiff').onclick = () => { $('#valVarBox').hidden = false; $('#valVar').placeholder = '¿Cómo se hace donde vivís? (opcional)'; $('#valVarSend').dataset.kind = 'distinta'; };
@@ -953,7 +953,7 @@ $('#fbSend').onclick = async () => {
       const r = await sb('/rest/v1/sugerencias', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       $('#fbMsg').value = ''; fbCheck(); msg.textContent = '¡Gracias! Recibimos tu mensaje.'; return;
-    } catch (e) { msg.textContent = 'No se pudo enviar (' + (e.message || e.name) + '). Lo intentamos por otro medio.'; }
+    } catch (e) { msg.textContent = (console.warn('envio:', e.message || e.name), 'No se pudo enviar. Lo intentamos por otro medio.'); }
   }
   // Sin servidor (o si falló): se manda por el menú del celular, el correo o WhatsApp del equipo
   const text = `Appsign · ${tipo === 'error' ? 'Error' : tipo === 'sugerencia' ? 'Sugerencia' : 'Mensaje'}\n\n${mensaje}${contacto ? '\n\nContacto: ' + contacto : ''}${tech ? '\n\n(' + tech + ')' : ''}`;

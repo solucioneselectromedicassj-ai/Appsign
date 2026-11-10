@@ -2,3 +2,11 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+
+# Secretos y claves de firma: nunca al repositorio
+.env
+.env.*
+*.keystore
+*.jks
+*.pem
+*.p12
