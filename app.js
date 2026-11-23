@@ -12,7 +12,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Ajustes ----------
-const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'marea', help: false, cue: true, guide: true, face: false };
+const defaults = { thr: 0.25, auto: true, lefty: false, speak: false, cvSize: 32, cvFlip: false, facing: 'environment', fs: 1, theme: 'auto', accent: 'marea', help: false, cue: true, guide: true, face: false, cap: true };
 let S = { ...defaults };
 try { S = { ...defaults, ...JSON.parse(localStorage.getItem('lsa-settings') || '{}') }; } catch (e) { /* sin storage */ }
 if (!S.v) { S.cvFlip = false; S.v = 2; }
@@ -365,7 +365,7 @@ function labelLast(word) {
 
 function renderTranscript() {
   const el = $('#transcript');
-  renderPhrase();
+  renderPhrase(); updateLiveCap();
   if (!transcript.length) { el.innerHTML = '<span class="mut">Poné las manos en cuadro, hacé la seña y bajalas.</span>'; return; }
   el.innerHTML = transcript.map((t, i) => `<span class="chip ${t.phrase ? 'phrase' : t.word && !t.doubt ? '' : 'unk'} ${i === transcript.length - 1 ? 'last' : ''}">${t.phrase ? esc(t.phrase) : t.word ? (t.doubt ? '¿' + esc(t.word) + '?' : esc(t.word)) : '¿?'}${t.q ? '<b class="qb" title="La cara marcó pregunta (ceño fruncido)">?</b>' : ''}</span>`).join('');
 }
@@ -559,7 +559,7 @@ document.querySelectorAll('button[data-accent]').forEach(b => b.onclick = () => 
 
 // ---------- Ajustes ----------
 function loadSettingsUI() {
-  applyLook(); $('#setFace').checked = S.face; $('#setGuide').checked = S.guide; $('#setHelp').checked = S.help; $('#setCue').checked = S.cue; corrUI();
+  applyLook(); $('#setFace').checked = S.face; $('#setGuide').checked = S.guide; $('#setHelp').checked = S.help; $('#setCue').checked = S.cue; $('#setCap').checked = S.cap; corrUI();
   $('#setFacing').value = S.facing; $('#setAuto').checked = S.auto; $('#setThr').value = S.thr; $('#setLefty').checked = S.lefty; $('#setSpeak').checked = S.speak;
   updateThrLabel();
 }
@@ -571,6 +571,7 @@ $('#setFace').onchange = e => { S.face = e.target.checked; saveS(); if (S.face) 
 $('#setGuide').onchange = e => { S.guide = e.target.checked; saveS(); if (S.guide) ensureFaceDet(); else setGuide('', ''); };
 $('#setHelp').onchange = e => { S.help = e.target.checked; saveS(); corrUI(); };
 $('#setCue').onchange = e => { S.cue = e.target.checked; saveS(); };
+$('#setCap').onchange = e => { S.cap = e.target.checked; saveS(); updateLiveCap(); };
 $('#setLefty').onchange = e => { S.lefty = e.target.checked; saveS(); };
 $('#setSpeak').onchange = e => { S.speak = e.target.checked; saveS(); };
 
@@ -582,6 +583,7 @@ let cvLast = null;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 function cvRender() {
+  updateLiveCap();
   $('#cvVoiceLog').innerHTML = voiceLines.slice(-6).map(t => `<p class="ln">${esc(t)}</p>`).join('');
   $('#cvSignLog').innerHTML = signLines.slice(-6).map(l => `<p class="ln">${l.words.map(w => w || '¿?').map(esc).join(' ')}</p>`).join('');
   const alt = $('#cvAlt'); alt.innerHTML = '';
@@ -690,6 +692,17 @@ function wrapText(ctx, text, maxW) {
   }
   if (line) out.push(line);
   return out;
+}
+
+// Subtítulo en vivo sobre la imagen de la cámara: letra grande, últimas palabras, para leer sin bajar la pantalla.
+function updateLiveCap() {
+  const el = $('#liveCap'); if (!el) return;
+  const lines = S.cap ? subtitleLines() : [];
+  const txt = lines.join(' · ');
+  clearTimeout(updateLiveCap.t);
+  if (!txt) { el.classList.remove('on'); el.innerHTML = ''; return; }
+  el.innerHTML = '<span>' + esc(txt) + '</span>'; el.classList.add('on');
+  updateLiveCap.t = setTimeout(() => el.classList.remove('on'), 12000);   // no queda un texto viejo tapando la imagen
 }
 
 function drawRecFrame(r) {
@@ -1000,7 +1013,7 @@ function updateUI() {
   if (!mode && rec) stopRecording();
 }
 function showTab(name) {
-  tab = name; spotter.reset(); spellSpotter.reset();
+  tab = name; spotter.reset(); spellSpotter.reset(); updateLiveCap();
   if (name !== 'translate' && spellOn) { spellOn = false; renderSpell(); }
   if (name !== 'converse') converseStop();
   (name === 'converse' ? $('#cvStageSlot') : $('main')).insertBefore(stage, name === 'converse' ? null : $('#tab-translate'));

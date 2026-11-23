@@ -65,6 +65,10 @@ section{display:none} section.on{display:block;animation:in .18s ease-out}
 .ibtn.rec.on{background:var(--bad);border-color:var(--bad);animation:pulse 1.1s infinite}
 #recTime{position:absolute;top:18px;left:14px;color:#fff;font-size:.8rem;background:var(--bad);padding:2px 9px;border-radius:99px;display:none}
 #stage.recording #recTime{display:block}
+#liveCap{position:absolute;left:8px;right:8px;bottom:44px;text-align:center;pointer-events:none;display:none;z-index:2}
+#liveCap span{display:inline-block;max-width:100%;font-weight:700;font-size:clamp(1.15rem,5.2vw,1.9rem);line-height:1.25;color:#fff;background:#000c;padding:6px 14px;border-radius:12px;text-shadow:0 1px 2px #000;overflow-wrap:anywhere}
+#liveCap.on{display:block}
+#stage.small #liveCap span{font-size:.9rem}
 #stage.small{max-width:240px;margin-left:auto;margin-right:auto}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
 button,select,input[type=text],input[type=file]{font:inherit;color:var(--txt)}
@@ -194,6 +198,7 @@ a{color:var(--acc)}
       </button>
     </div>
     <div id="guide" class="guide" style="display:none"></div>
+    <div id="liveCap" aria-live="polite"></div>
     <div id="stageMsg">Cámara apagada</div>
   </div>
 
@@ -415,6 +420,7 @@ a{color:var(--acc)}
       <label class="chk"><input type="checkbox" id="setSpeak"> <span>Leer en voz alta cada palabra reconocida</span></label>
       <label class="chk"><input type="checkbox" id="setFace"> <span>Cejas y boca (experimental): si frunce el ceño al hacer una seña, la marca como pregunta. Usa un modelo de cara más, así que gasta más batería.</span></label>
       <label class="chk"><input type="checkbox" id="setGuide" checked> <span>Ayuda de encuadre: avisa si conviene acercarse, alejarse o inclinar el celular</span></label>
+      <label class="chk"><input type="checkbox" id="setCap" checked> <span>Mostrar el texto traducido en letra grande sobre la imagen de la cámara (así no hay que bajar la pantalla para leerlo)</span></label>
       <label class="chk"><input type="checkbox" id="setCue" checked> <span>Avisar con vibración y un sonido suave cuando termina de leer una seña (para no tener que mirar la pantalla)</span></label>
       <label class="chk"><input type="checkbox" id="setHelp"> <span>Ayudar a mejorar la app: guardar en mi celular las señas que confirmo o corrijo (solo los puntos de las manos, sin video ni cara). Las mando yo al equipo desde Colaborar.</span></label>
     </div>
