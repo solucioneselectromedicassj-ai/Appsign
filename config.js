@@ -1,6 +1,7 @@
 // Datos del equipo para «Colaborar» (los videos llegan por correo, con la palabra como asunto). Completalos antes de publicar.
 export const CONFIG = {
   equipo: 'Equipo Appsign',
+  whatsapp: '5492644474932',               // número del equipo para recibir aportes por WhatsApp (con código de país, sin + ni espacios)
   email: 'appsignsoporte@gmail.com',      // ej.: 'colaborar@tudominio.com'
   lengua: 'LSA',     // lengua de señas de este vocabulario (LSA = Argentina). Otros países: LIBRAS, LSM…
   pais: 'AR',        // país (código de 2 letras)

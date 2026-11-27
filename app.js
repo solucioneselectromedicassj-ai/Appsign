@@ -505,7 +505,8 @@ function collabUpdate() {
   const st = wordStatus(), m = $('#cWordMsg');
   const txt = { full: `«${st.w}» ya tiene todos los aportes que necesitamos. ¡Gracias! Probá con otra palabra de la lista.`, have: `«${st.w}» ya está en el vocabulario. Probá con una de «Palabras que buscamos».`, notwanted: `«${st.w}» no está en la lista de palabras que buscamos ahora. Podés proponerla en «Sugerencias y errores» (Ajustes).`, ok: st.hit ? `Faltan ${st.hit.goal - st.hit.have} aporte${st.hit.goal - st.hit.have === 1 ? '' : 's'} de «${st.w}». ¡Gracias por sumar!` : '', empty: '' }[st.state];
   m.textContent = txt; m.dataset.kind = st.state;
-  $('#cSend').disabled = !(C.file && st.w && st.state === 'ok' && $('#cConsent').checked && acctOk);
+  const canSend = !!(C.file && st.w && st.state === 'ok' && $('#cConsent').checked && acctOk);
+  $('#cSend').disabled = !canSend; $('#cWa').disabled = !canSend;
 }
 function pickFile(f) {
   if (C.url) URL.revokeObjectURL(C.url);
@@ -514,27 +515,40 @@ function pickFile(f) {
   if (!f) { p.innerHTML = ''; collabUpdate(); return; }
   const mb = (f.size / 1048576).toFixed(1);
   p.innerHTML = (f.type.startsWith('image/') ? `<img src="${C.url}" style="max-width:100%;max-height:260px;border-radius:10px">` : `<video src="${C.url}" controls playsinline muted style="max-width:100%;max-height:260px;border-radius:10px"></video>`)
-    + `<div class="mut">${esc(f.name)} · ${mb} MB${f.size > 30 * 1048576 ? ' — es pesado: probá con un video más corto' : ''}</div>`;
+    + `<div class="mut">${esc(f.name)} · ${mb} MB${f.size > 30 * 1048576 ? ' — es pesado: probá con un video más corto' : ''}</div>`
+    + `<p class="note">Esto es un <b>prototipo</b>. Para que funcione necesitamos <b>varios videos de cada palabra</b>, hechos por personas distintas: si podés, grabá más de uno o pedile a otra persona que lo haga.</p>`;
   collabUpdate();
 }
 $('#cVideo').onchange = e => { pickFile(e.target.files[0]); e.target.value = ''; };
 $('#cPhoto').onchange = e => { pickFile(e.target.files[0]); e.target.value = ''; };
 ['#cWord', '#cConsent'].forEach(s => $(s).addEventListener('input', collabUpdate));
 $('#cConsent').addEventListener('change', collabUpdate);
+if (CONFIG.whatsapp) { $('#cWa').hidden = false; $('#cWaHelp').hidden = false; }
 $('#cContactInfo').textContent = CONFIG.email
   ? `Se envía por correo a ${CONFIG.equipo} (${CONFIG.email}) con el título de la palabra. El equipo descarga el video, lo procesa y borra el correo.`
   : 'Al enviar se abre el menú del celular para elegir el correo del equipo.';
+const THANKS_MORE = ' Recordá: necesitamos varios videos de cada palabra, de personas distintas. Si podés, mandá otro.';
+function collabText(w) {
+  return ['Aporte para Appsign (prototipo)', 'Palabra: ' + w, 'Región: ' + ($('#cRegion').value.trim() || '—'), 'Contacto: ' + ($('#cContact').value.trim() || '—'),
+    ses && profile ? `ID de colaborador: ${ses.user.id} (${profile.rol}, ${profile.pais})` : '',
+    'Acepto que el equipo vea este archivo para validar la seña y usarla solo para el vocabulario. El equipo lo descarga, lo procesa en una computadora y borra este mensaje.'].filter(Boolean).join('\n');
+}
+$('#cWa').onclick = () => {
+  const w = normWord($('#cWord').value);
+  if (!C.file || !w || !$('#cConsent').checked || !CONFIG.whatsapp) return;
+  const url = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(collabText(w) + '\n\n(Te adjunto el video a continuación)')}`;
+  $('#cMsg').textContent = 'Se abre WhatsApp. Tocá el clip 📎, elegí el video y enviá.' + THANKS_MORE;
+  window.open(url, '_blank', 'noopener');
+};
 $('#cSend').onclick = async () => {
   const f0 = C.file, w = normWord($('#cWord').value);
   if (!f0 || !w || !$('#cConsent').checked) return;
   const ext = (f0.name.split('.').pop() || (f0.type.startsWith('image/') ? 'jpg' : 'mp4')).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
   const f = new File([f0], `appsign-${w.replace(/[^\p{L}\p{N}]+/gu, '_')}.${ext}`, { type: f0.type });
-  const text = ['Aporte para Appsign', 'Palabra: ' + w, 'Región: ' + ($('#cRegion').value.trim() || '—'), 'Contacto: ' + ($('#cContact').value.trim() || '—'),
-    ses && profile ? `ID de colaborador: ${ses.user.id} (${profile.rol}, ${profile.pais})` : '',
-    'Acepto que el equipo vea este archivo para validar la seña y usarla solo para el vocabulario. El equipo lo descarga, lo procesa en una computadora y borra este correo.'].filter(Boolean).join('\n');
+  const text = collabText(w);
   $('#cMsg').textContent = '';
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
-    try { await navigator.share({ files: [f], title: w, text }); $('#cMsg').textContent = '¡Gracias! Si elegiste el correo del equipo, lo va a revisar.'; return; }
+    try { await navigator.share({ files: [f], title: w, text }); $('#cMsg').textContent = '¡Gracias! Si elegiste el correo del equipo, lo va a revisar.' + THANKS_MORE; return; }
     catch (e) { if (e && e.name === 'AbortError') { $('#cMsg').textContent = 'Envío cancelado.'; return; } }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
