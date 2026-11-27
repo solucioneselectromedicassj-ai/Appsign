@@ -512,13 +512,42 @@ function wordStatus() {
   if (lib.some(s => s.word === w)) return { w, state: 'have' };           // ya está en el vocabulario aprobado
   return wanted.length ? { w, state: 'notwanted' } : { w, state: 'ok' };   // sin lista publicada: se acepta cualquiera (como antes)
 }
+// Horario de recepción de videos (CONFIG.horario): fuera de ese horario se puede grabar y preparar, pero el envío espera.
+const DAYN = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+function argNow(d = new Date()) {
+  const z = (CONFIG.horario && CONFIG.horario.zona) || 'America/Argentina/San_Juan';
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: z, weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(d).map(x => [x.type, x.value]));
+  return { day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday), mins: (+p.hour) * 60 + (+p.minute) };
+}
+function horario() {
+  const H = CONFIG.horario; if (!H) return { open: true, label: '', next: '' };
+  const n = argNow(), dias = H.dias || [1, 2, 3, 4, 5];
+  const open = dias.includes(n.day) && n.mins >= H.desde * 60 && n.mins < H.hasta * 60;
+  const rango = `${DAYN[dias[0]]} a ${DAYN[dias[dias.length - 1]]} de ${H.desde} a ${H.hasta} h (hora de Argentina)`;
+  let next = '';
+  if (!open) {
+    for (let k = 0; k < 8; k++) {
+      const dd = (n.day + k) % 7; if (!dias.includes(dd)) continue;
+      if (k === 0 && n.mins >= H.desde * 60) continue;      // hoy ya cerró
+      next = k === 0 ? `hoy a las ${H.desde}:00` : k === 1 ? `mañana (${DAYN[dd]}) a las ${H.desde}:00` : `el ${DAYN[dd]} a las ${H.desde}:00`; break;
+    }
+  }
+  return { open, label: rango, next };
+}
+function renderHours() {
+  const el = $('#cHours'); if (!el) return; const hz = horario();
+  el.hidden = !hz.label;
+  el.innerHTML = hz.open ? `Recibimos videos <b>${esc(hz.label)}</b>. Ahora estamos recibiendo.` : `Recibimos videos <b>${esc(hz.label)}</b>. Ahora está cerrado: podés grabar y dejar todo listo, y mandarlo ${esc(hz.next)}.`;
+}
+setInterval(() => { if ($('#cHours')) { renderHours(); collabUpdate(); } }, 60000);
 function collabUpdate() {
   const acctOk = !AUTH_OK || !!(ses && profile);
   $('#cNeedAcct').hidden = acctOk;
   const st = wordStatus(), m = $('#cWordMsg');
   const txt = { full: `«${st.w}» ya tiene todos los aportes que necesitamos. ¡Gracias! Probá con otra palabra de la lista.`, have: `«${st.w}» ya está en el vocabulario. Probá con una de «Palabras que buscamos».`, notwanted: `«${st.w}» no está en la lista de palabras que buscamos ahora. Podés proponerla en «Sugerencias y errores» (Ajustes).`, ok: st.hit ? `Faltan ${st.hit.goal - st.hit.have} aporte${st.hit.goal - st.hit.have === 1 ? '' : 's'} de «${st.w}». ¡Gracias por sumar!` : '', empty: '' }[st.state];
   m.textContent = txt; m.dataset.kind = st.state;
-  const canSend = !!(C.file && st.w && st.state === 'ok' && $('#cConsent').checked && acctOk);
+  renderHours();
+  const canSend = !!(C.file && st.w && st.state === 'ok' && $('#cConsent').checked && acctOk && horario().open);
   $('#cSend').disabled = !canSend; $('#cWa').disabled = !canSend;
 }
 function pickFile(f) {
