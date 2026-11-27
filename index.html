@@ -294,6 +294,7 @@ a{color:var(--acc)}
       <h3>Palabras que buscamos</h3>
       <p class="mut">Tocá una palabra para mandar tu video de esa seña. El número es cuántas personas distintas ya aportaron y la meta. Cuando está completa, se deja de pedir.</p>
       <p class="mut" id="wantedCount" role="status" aria-live="polite"></p>
+      <p class="mut" id="sentInfo" hidden><span id="sentTxt"></span> <button id="sentToggle" class="ghost" type="button"></button></p>
       <div id="wantedList" class="wants"></div>
     </div>
     <div class="card">
@@ -324,6 +325,7 @@ a{color:var(--acc)}
       <div class="row"><button id="cWa" class="ok big-btn" disabled hidden>Enviar por WhatsApp</button><button id="cSend" class="ghost big-btn" disabled>Compartir por correo u otra app</button></div>
       <p class="mut" id="cWaHelp" hidden>Se abre WhatsApp con el mensaje y el consentimiento ya escritos. Después tocá el clip 📎 y adjuntá el video.</p>
       <div id="cMsg" class="mut" role="status" aria-live="polite"></div>
+      <div class="row"><button id="cSent" class="ok" hidden>Ya la mandé</button></div>
       <div id="cContactInfo" class="mut"></div>
     </div>
     <div class="card">

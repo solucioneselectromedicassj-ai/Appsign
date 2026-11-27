@@ -62,15 +62,25 @@ function announceUpdate() {
     $('#newsOk').onclick = () => { mark(); box.style.display = 'none'; };
   } else box.style.display = 'none';
 }
+// «Ya la mandé»: palabras que esta persona ya mandó desde este celular (solo en el celular, no se envía a ningún lado).
+const SENT_KEY = 'appsign-sent';
+let sent = new Set(), showSent = false;
+try { sent = new Set(JSON.parse(localStorage.getItem(SENT_KEY) || '[]')); } catch (e) { /* sin storage */ }
+const saveSent = () => { try { localStorage.setItem(SENT_KEY, JSON.stringify([...sent])); } catch (e) { /* ignorar */ } };
 function renderWanted() {
   const card = $('#wantedCard'); if (!card) return;
   const dl = $('#wordList'); if (dl && wanted.length) dl.innerHTML = wanted.filter(w => w.have < w.goal).map(w => `<option value="${esc(w.word)}">`).join('');
   if ($('#cWord')) collabUpdate();
   card.hidden = !wanted.length;
-  // Solo se muestran las palabras que todavía faltan: las que llegaron a la meta desaparecen de la lista.
-  const pend = wanted.filter(w => w.have < w.goal);
-  $('#wantedCount').textContent = pend.length ? `Faltan videos de ${pend.length} ${pend.length === 1 ? 'palabra' : 'palabras'} (de ${wanted.length}). A medida que se completan, salen de la lista.` : '¡Completamos toda la lista! Gracias a todas las personas que aportaron.';
-  $('#wantedList').innerHTML = pend.map(w => `<button class="want" data-w="${esc(w.word)}">${esc(w.word)} <span>${w.have}/${w.goal}</span></button>`).join('');
+  // Solo se muestran las palabras que todavía faltan: las que llegaron a la meta, o que esta persona ya mandó, salen de la lista.
+  const open = wanted.filter(w => w.have < w.goal), mine = open.filter(w => sent.has(w.word));
+  const pend = showSent ? open : open.filter(w => !sent.has(w.word));
+  const left = open.length - mine.length;
+  $('#wantedCount').textContent = open.length ? `Faltan videos de ${left} ${left === 1 ? 'palabra' : 'palabras'} (de ${wanted.length}). A medida que se completan, salen de la lista.` : '¡Completamos toda la lista! Gracias a todas las personas que aportaron.';
+  $('#sentInfo').hidden = !mine.length;
+  $('#sentTxt').textContent = `Ya mandaste ${mine.length} ${mine.length === 1 ? 'palabra' : 'palabras'} desde este celular.`;
+  $('#sentToggle').textContent = showSent ? 'Ocultarlas' : 'Mostrarlas';
+  $('#wantedList').innerHTML = pend.map(w => `<button class="want ${sent.has(w.word) ? 'done' : ''}" data-w="${esc(w.word)}">${esc(w.word)} <span>${sent.has(w.word) ? '✓ mandada' : w.have + '/' + w.goal}</span></button>`).join('');
 }
 $('#wantedList').addEventListener('click', e => { const b = e.target.closest('button[data-w]'); if (!b) return; $('#cWord').value = b.dataset.w; collabUpdate(); $('#cWord').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
 
@@ -530,6 +540,17 @@ if (CONFIG.whatsapp) { $('#cWa').hidden = false; $('#cWaHelp').hidden = false; }
 $('#cContactInfo').textContent = CONFIG.email
   ? `Se envía por correo a ${CONFIG.equipo} (${CONFIG.email}) con el título de la palabra. El equipo descarga el video, lo procesa y borra el correo.`
   : 'Al enviar se abre el menú del celular para elegir el correo del equipo.';
+$('#sentToggle').onclick = () => { showSent = !showSent; renderWanted(); };
+let lastSentWord = '';
+function offerSent(w) { lastSentWord = w; const b = $('#cSent'); b.hidden = false; b.textContent = `Ya mandé «${w}»`; }
+$('#cSent').onclick = () => {
+  const w = lastSentWord; if (!w) return;
+  sent.add(w); saveSent();
+  $('#cSent').hidden = true; lastSentWord = '';
+  pickFile(null); $('#cWord').value = ''; $('#cConsent').checked = false;
+  $('#cMsg').textContent = `¡Gracias! «${w}» salió de tu lista. Si podés, elegí otra palabra.` + ' Recordá que necesitamos varios videos de personas distintas.';
+  renderWanted();
+};
 const THANKS_MORE = ' Recordá: necesitamos varios videos de cada palabra, de personas distintas. Si podés, mandá otro.';
 function collabText(w) {
   return ['Aporte para Appsign (prototipo)', 'Palabra: ' + w, 'Región: ' + ($('#cRegion').value.trim() || '—'), 'Contacto: ' + ($('#cContact').value.trim() || '—'),
@@ -540,7 +561,8 @@ $('#cWa').onclick = () => {
   const w = normWord($('#cWord').value);
   if (!C.file || !w || !$('#cConsent').checked || !CONFIG.whatsapp) return;
   const url = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(collabText(w) + '\n\n(Te adjunto el video a continuación)')}`;
-  $('#cMsg').textContent = 'Se abre WhatsApp. Tocá el clip 📎, elegí el video y enviá.' + THANKS_MORE;
+  $('#cMsg').textContent = 'Se abre WhatsApp. Tocá el clip 📎, elegí el video y enviá. Cuando lo hayas mandado, tocá «Ya la mandé».';
+  offerSent(w);
   window.open(url, '_blank', 'noopener');
 };
 $('#cSend').onclick = async () => {
@@ -551,13 +573,14 @@ $('#cSend').onclick = async () => {
   const text = collabText(w);
   $('#cMsg').textContent = '';
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
-    try { await navigator.share({ files: [f], title: w, text }); $('#cMsg').textContent = '¡Gracias! Si elegiste el correo del equipo, lo va a revisar.' + THANKS_MORE; return; }
+    try { await navigator.share({ files: [f], title: w, text }); $('#cMsg').textContent = '¡Gracias! Si elegiste el correo del equipo, lo va a revisar. Cuando lo hayas mandado, tocá «Ya la mandé».'; offerSent(w); return; }
     catch (e) { if (e && e.name === 'AbortError') { $('#cMsg').textContent = 'Envío cancelado.'; return; } }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 3000);
   if (CONFIG.email) location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent(w)}&body=${encodeURIComponent(text + '\n\n(Adjuntá el archivo descargado)')}`;
   $('#cMsg').textContent = CONFIG.email ? 'Se descargó el archivo. Adjuntalo al correo que se abre para mandarlo al equipo.' : 'Se descargó el archivo. Mandalo al equipo por correo.';
+  offerSent(w);
 };
 
 // ---------- Apariencia (tamaño de letra, fondo y color) ----------
