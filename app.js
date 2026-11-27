@@ -557,19 +557,37 @@ function collabText(w) {
     ses && profile ? `ID de colaborador: ${ses.user.id} (${profile.rol}, ${profile.pais})` : '',
     'Acepto que el equipo vea este archivo para validar la seña y usarla solo para el vocabulario. El equipo lo descarga, lo procesa en una computadora y borra este mensaje.'].filter(Boolean).join('\n');
 }
-$('#cWa').onclick = () => {
+function collabFile(w) {
+  const f0 = C.file;
+  const ext = (f0.name.split('.').pop() || (f0.type.startsWith('image/') ? 'jpg' : 'mp4')).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
+  return new File([f0], `appsign-${w.replace(/[^\p{L}\p{N}]+/gu, '_')}.${ext}`, { type: f0.type });
+}
+// WhatsApp: se comparte el video YA ADJUNTO con el mensaje y el consentimiento; la persona solo elige el contacto del equipo.
+// Si el celular no puede compartir archivos, se abre el chat con el mensaje y se adjunta el video con el clip.
+$('#cWa').onclick = async () => {
   const w = normWord($('#cWord').value);
   if (!C.file || !w || !$('#cConsent').checked || !CONFIG.whatsapp) return;
-  const url = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(collabText(w) + '\n\n(Te adjunto el video a continuación)')}`;
+  const f = collabFile(w), text = collabText(w);
+  $('#cMsg').textContent = '';
+  if (navigator.canShare && navigator.canShare({ files: [f] })) {
+    try { await navigator.share({ files: [f], title: w, text }); $('#cMsg').textContent = 'Si lo mandaste al contacto del equipo, ¡gracias! Tocá «Ya la mandé».'; offerSent(w); return; }
+    catch (e) { if (e && e.name === 'AbortError') { $('#cMsg').textContent = 'Envío cancelado.'; return; } }
+  }
   $('#cMsg').textContent = 'Se abre WhatsApp. Tocá el clip 📎, elegí el video y enviá. Cuando lo hayas mandado, tocá «Ya la mandé».';
   offerSent(w);
-  window.open(url, '_blank', 'noopener');
+  window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text + '\n\n(Te adjunto el video a continuación)')}`, '_blank', 'noopener');
+};
+// Contacto del equipo (vCard): se guarda con un toque y después aparece al elegir a quién mandar en WhatsApp.
+$('#cVcard').onclick = e => {
+  e.preventDefault(); if (!CONFIG.whatsapp) return;
+  const v = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:Appsign (equipo)', 'ORG:Appsign', `TEL;TYPE=CELL:+${CONFIG.whatsapp}`, 'END:VCARD'].join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([v], { type: 'text/vcard' })); a.download = 'appsign-equipo.vcf'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
 };
 $('#cSend').onclick = async () => {
-  const f0 = C.file, w = normWord($('#cWord').value);
-  if (!f0 || !w || !$('#cConsent').checked) return;
-  const ext = (f0.name.split('.').pop() || (f0.type.startsWith('image/') ? 'jpg' : 'mp4')).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
-  const f = new File([f0], `appsign-${w.replace(/[^\p{L}\p{N}]+/gu, '_')}.${ext}`, { type: f0.type });
+  const w = normWord($('#cWord').value);
+  if (!C.file || !w || !$('#cConsent').checked) return;
+  const f = collabFile(w);
   const text = collabText(w);
   $('#cMsg').textContent = '';
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
@@ -866,7 +884,7 @@ function browFlag(t0, t1) {
 // ---------- Cuenta: «Ingresar con Google» (Supabase Auth con PKCE; sin librerías de terceros) ----------
 const SB = (CONFIG.supabaseUrl || '').replace(/\/+$/, '');
 const AUTH_OK = !!(SB && CONFIG.supabaseKey);
-const SES_KEY = 'appsign-session', PKCE_KEY = 'appsign-pkce', TERMS_VERSION = '2026-11-02';
+const SES_KEY = 'appsign-session', PKCE_KEY = 'appsign-pkce', TERMS_VERSION = '2026-11-27';
 let ses = null, profile = null;
 try { ses = JSON.parse(localStorage.getItem(SES_KEY) || 'null'); } catch (e) { /* sin storage */ }
 const saveSes = v => { ses = v; try { v ? localStorage.setItem(SES_KEY, JSON.stringify(v)) : localStorage.removeItem(SES_KEY); } catch (e) { /* sin storage */ } };
