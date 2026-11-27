@@ -67,7 +67,10 @@ function renderWanted() {
   const dl = $('#wordList'); if (dl && wanted.length) dl.innerHTML = wanted.filter(w => w.have < w.goal).map(w => `<option value="${esc(w.word)}">`).join('');
   if ($('#cWord')) collabUpdate();
   card.hidden = !wanted.length;
-  $('#wantedList').innerHTML = wanted.map(w => `<button class="want ${w.have >= w.goal ? 'done' : ''}" data-w="${esc(w.word)}" ${w.have >= w.goal ? 'disabled' : ''}>${esc(w.word)} <span>${w.have >= w.goal ? '✓' : w.have + '/' + w.goal}</span></button>`).join('');
+  // Solo se muestran las palabras que todavía faltan: las que llegaron a la meta desaparecen de la lista.
+  const pend = wanted.filter(w => w.have < w.goal);
+  $('#wantedCount').textContent = pend.length ? `Faltan videos de ${pend.length} ${pend.length === 1 ? 'palabra' : 'palabras'} (de ${wanted.length}). A medida que se completan, salen de la lista.` : '¡Completamos toda la lista! Gracias a todas las personas que aportaron.';
+  $('#wantedList').innerHTML = pend.map(w => `<button class="want" data-w="${esc(w.word)}">${esc(w.word)} <span>${w.have}/${w.goal}</span></button>`).join('');
 }
 $('#wantedList').addEventListener('click', e => { const b = e.target.closest('button[data-w]'); if (!b) return; $('#cWord').value = b.dataset.w; collabUpdate(); $('#cWord').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
 
