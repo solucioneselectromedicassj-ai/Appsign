@@ -64,7 +64,7 @@ function announceUpdate() {
 }
 // «Ya la mandé»: palabras que esta persona ya mandó desde este celular (solo en el celular, no se envía a ningún lado).
 const SENT_KEY = 'appsign-sent';
-let sent = new Set(), showSent = false;
+let sent = new Set(), showSent = false, showAll = false;
 try { sent = new Set(JSON.parse(localStorage.getItem(SENT_KEY) || '[]')); } catch (e) { /* sin storage */ }
 const saveSent = () => { try { localStorage.setItem(SENT_KEY, JSON.stringify([...sent])); } catch (e) { /* ignorar */ } };
 function renderWanted() {
@@ -80,7 +80,11 @@ function renderWanted() {
   $('#sentInfo').hidden = !mine.length;
   $('#sentTxt').textContent = `Ya mandaste ${mine.length} ${mine.length === 1 ? 'palabra' : 'palabras'} desde este celular.`;
   $('#sentToggle').textContent = showSent ? 'Ocultarlas' : 'Mostrarlas';
-  $('#wantedList').innerHTML = pend.map(w => `<button class="want ${sent.has(w.word) ? 'done' : ''}" data-w="${esc(w.word)}">${esc(w.word)} <span>${sent.has(w.word) ? '✓ mandada' : w.have + '/' + w.goal}</span></button>`).join('');
+  // Lista corta: solo las próximas palabras; «Ver todas» abre el resto en una caja con scroll (para no llenar la pantalla).
+  const SHORT = 8, more = pend.length > SHORT, shown = showAll || !more ? pend : pend.slice(0, SHORT);
+  $('#wantedList').classList.toggle('all', showAll && more);
+  const mb = $('#wantedMore'); mb.hidden = !more; mb.textContent = showAll ? 'Mostrar menos' : `Ver todas (${pend.length})`;
+  $('#wantedList').innerHTML = shown.map(w => `<button class="want ${sent.has(w.word) ? 'done' : ''}" data-w="${esc(w.word)}">${esc(w.word)} <span>${sent.has(w.word) ? '✓ mandada' : w.have + '/' + w.goal}</span></button>`).join('');
 }
 $('#wantedList').addEventListener('click', e => { const b = e.target.closest('button[data-w]'); if (!b) return; $('#cWord').value = b.dataset.w; collabUpdate(); $('#cWord').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
 
@@ -569,6 +573,7 @@ if (CONFIG.whatsapp) { $('#cWa').hidden = false; $('#cWaHelp').hidden = false; }
 $('#cContactInfo').textContent = CONFIG.email
   ? `Se envía por correo a ${CONFIG.equipo} (${CONFIG.email}) con el título de la palabra. El equipo descarga el video, lo procesa y borra el correo.`
   : 'Al enviar se abre el menú del celular para elegir el correo del equipo.';
+$('#wantedMore').onclick = () => { showAll = !showAll; renderWanted(); };
 $('#sentToggle').onclick = () => { showSent = !showSent; renderWanted(); };
 let lastSentWord = '';
 function offerSent(w) { lastSentWord = w; const b = $('#cSent'); b.hidden = false; b.textContent = `Ya mandé «${w}»`; }
